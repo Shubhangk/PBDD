@@ -57,3 +57,10 @@ def Test6():
     Q_clone = Q.deepclone()
     print("Clone Quast:\n")
     Q_clone.print_tree()
+
+def Test7():
+    A = isl.Set("{[x,y]: x >= 0 or y <= 19}")
+    a = Quast(A)
+    a.print_tree()
+    T = a.reconstruct_set()
+    print(T == A)
