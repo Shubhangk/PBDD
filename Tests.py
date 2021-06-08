@@ -1,7 +1,5 @@
-# Todo -- remove reference to main
 from Quast import *
 import islpy as isl
-# from Quast import *
 
 def Test1():
     A = isl.BasicSet("{[x,y]: x >= 0 and y >=8 }")
