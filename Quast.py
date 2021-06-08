@@ -137,3 +137,18 @@ class Quast:
         quast_copy = quast.deepclone()
         self_copy.intersect(quast_copy)
         return self_copy
+
+    def negate_constraint(self, constraint):
+        coefficients = constraint.get_coefficients_by_name()
+        for var in coefficients.keys():
+            coefficients[var] = coefficients[var].neg()
+
+        new = constraint.set_coefficients_by_name(coefficients)
+        new = new.set_constant_val(new.get_constant_val() - 1)
+        return new
+
+    def reconstruct_set(self):
+        return None
+
+    def rec_reconstruct_set(self):
+        return None
