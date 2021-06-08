@@ -1,3 +1,5 @@
+import islpy
+
 from Node import *
 
 # Description: The Quast class below represents quasts for islpy.Sets
@@ -19,17 +21,18 @@ class Quast:
         self.space = new_space
 
     def get_parent_list(self, node):
-        parent_list = []
-        self.rec_get_parent_list(node, self.root_node, parent_list)
-        return parent_list
+        return self.rec_get_parent_list(node, self.root_node)
 
-    def rec_get_parent_list(self, current, target, parent_list):
-        if current is target:
-            return
-        elif current.true_branch_node is target or current.false_branch_node is target:
-            parent_list.append(current)
-        self.rec_get_parent_list(current.true_branch_node, target, parent_list)
-        self.rec_get_parent_list(current.false_branch_node, target, parent_list)
+
+    def rec_get_parent_list(self, target, current):
+        if current is target or current is None:
+            return []
+        is_current_parent = []
+        if current.true_branch_node is target or current.false_branch_node is target:
+            is_current_parent = [current]
+        parents_from_true_branch = self.rec_get_parent_list(current.true_branch_node, target)
+        parents_from_false_branch = self.rec_get_parent_list(current.false_branch_node, target)
+        return parents_from_true_branch + parents_from_false_branch + is_current_parent
 
     # Description: proxy function for recursively printing QUAST level-by-level
     def print_tree(self):
@@ -143,12 +146,57 @@ class Quast:
         for var in coefficients.keys():
             coefficients[var] = coefficients[var].neg()
 
-        new = constraint.set_coefficients_by_name(coefficients)
-        new = new.set_constant_val(new.get_constant_val() - 1)
-        return new
+        negated_constraint = constraint.set_coefficients_by_name(coefficients)
+        negated_constraint = negated_constraint.set_constant_val(negated_constraint.get_constant_val() - 1)
+        return negated_constraint
 
     def reconstruct_set(self):
-        return None
+        return self.rec_reconstruct_set(self.root_node, [])
 
-    def rec_reconstruct_set(self):
-        return None
+    def rec_reconstruct_set(self, curr_node, curr_constraints):
+        if curr_node is self.out_node:
+            return []
+        elif curr_node is self.in_node:
+            bset = islpy.BasicSet.universe(self.get_space())
+            for constraint in curr_constraints:
+                bset = bset.add_constraint(constraint)
+            return [bset]
+        else:
+            curr_constraints.append(curr_node.constraint)
+            bsets_from_true = self.rec_reconstruct_set(curr_node.true_branch_node, curr_constraints)
+            curr_constraints.pop()
+            curr_constraints.append(self.negate_constraint(curr_node.constraint))
+            bsets_from_false = self.rec_reconstruct_set(curr_node.false_branch_node, curr_constraints)
+            return bsets_from_true + bsets_from_false
+
+class BasicQuast(Quast):
+    def __init__(self, basic_set):
+        # Todo -- Error handling
+        self.in_node = Node(constraint="IN", is_terminal=True)
+        self.out_node = Node(constraint="OUT", is_terminal=True)
+        for constraint in basic_set.get_constraints():
+            self.add_node(constraint)
+        self.space = self.root_node.constraint.get_space()
+
+    def add_node(self, constraint):
+        node = Node(constraint)
+        if self.root_node is None:
+            self.root_node = node
+            node.true_branch_node = self.in_node
+            node.false_branch_node = self.out_node
+        else:
+            parent = self.get_parent_list(self.in_node)[0]
+            parent.true_branch_node = node
+            node.true_branch_node = self.in_node
+            node.false_branch_node = self.out_node
+
+
+
+A = islpy.BasicSet("{[x,y]: x >= 0 and y >=8 }")
+B = islpy.BasicSet("{[x,y]: y >= 7 }")
+a = BasicQuast(A)
+b = BasicQuast(B)
+a.print_tree()
+#a.union(b)
+T = a.reconstruct_set()
+print(T)
