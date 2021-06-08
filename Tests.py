@@ -1,8 +1,12 @@
+# Todo -- remove reference to main
+from main import *
+import islpy as isl
+# from Quast import *
+
 def Test1():
     A = isl.BasicSet("{[x,y]: x >= 0 and y >=8 }")
     Q = BasicQuast(A)
     Q.print_tree()
-
 
 def Test2():
     A = isl.BasicSet("{[x,y]: x >= 0 and y >=8 }")
@@ -53,5 +57,3 @@ def Test6():
     Q_clone = Q.deepclone()
     print("Clone Quast:\n")
     Q_clone.print_tree()
-
-Test6()

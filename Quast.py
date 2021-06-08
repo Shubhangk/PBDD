@@ -1,3 +1,5 @@
+from Node import *
+
 # Description: The Quast class below represents quasts for islpy.Sets
 class Quast:
     in_node = None  # Terminal node indicating containment inside polyhedron
