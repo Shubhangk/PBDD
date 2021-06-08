@@ -30,8 +30,8 @@ class Quast:
         is_current_parent = []
         if current.true_branch_node is target or current.false_branch_node is target:
             is_current_parent = [current]
-        parents_from_true_branch = self.rec_get_parent_list(current.true_branch_node, target)
-        parents_from_false_branch = self.rec_get_parent_list(current.false_branch_node, target)
+        parents_from_true_branch = self.rec_get_parent_list(target, current.true_branch_node)
+        parents_from_false_branch = self.rec_get_parent_list(target, current.false_branch_node)
         return parents_from_true_branch + parents_from_false_branch + is_current_parent
 
     # Description: proxy function for recursively printing QUAST level-by-level
@@ -171,7 +171,6 @@ class Quast:
 
 class BasicQuast(Quast):
     def __init__(self, basic_set):
-        # Todo -- Error handling
         self.in_node = Node(constraint="IN", is_terminal=True)
         self.out_node = Node(constraint="OUT", is_terminal=True)
         for constraint in basic_set.get_constraints():
@@ -197,6 +196,6 @@ B = islpy.BasicSet("{[x,y]: y >= 7 }")
 a = BasicQuast(A)
 b = BasicQuast(B)
 a.print_tree()
-#a.union(b)
+a.union(b)
 T = a.reconstruct_set()
 print(T)
