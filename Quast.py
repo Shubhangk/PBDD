@@ -9,10 +9,17 @@ class Quast:
     root_node = None  # Root node of the QUAST
     space = None
 
-    def __init__(self, space):
-        self.in_node = Node(constraint="IN", is_terminal=True)
-        self.out_node = Node(constraint="OUT", is_terminal=True)
-        self.set_space(space)
+    def __init__(self, set):
+        T = None
+        for basic_set in set.get_basic_sets():
+            if T is None:
+                T = BasicQuast(basic_set)
+            else:
+                T.union(BasicQuast(basic_set))
+        self.root_node = T.root_node
+        self.in_node = T.in_node
+        self.out_node = T.out_node
+        self.set_space(T.get_space())
 
     def get_space(self):
         return self.space
@@ -152,7 +159,6 @@ class Quast:
 
     def reconstruct_set(self):
         basic_set_list = self.rec_reconstruct_set(self.root_node, [])
-        print(basic_set_list)
         final_set = basic_set_list[0]
         for basic_set in basic_set_list:
             final_set = final_set.union(basic_set)
@@ -197,14 +203,3 @@ class BasicQuast(Quast):
             parent.true_branch_node = node
             node.true_branch_node = self.in_node
             node.false_branch_node = self.out_node
-
-
-
-A = isl.BasicSet("{[x,y]: x >= 0 }")
-B = isl.BasicSet("{[x,y]: y >= 7 }")
-a = BasicQuast(A)
-b = BasicQuast(B)
-a.union(b)
-a.print_tree()
-T = a.reconstruct_set()
-print(T)
