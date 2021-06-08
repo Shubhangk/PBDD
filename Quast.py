@@ -1,4 +1,4 @@
-import islpy
+import islpy as isl
 
 from Node import *
 
@@ -151,16 +151,24 @@ class Quast:
         return negated_constraint
 
     def reconstruct_set(self):
-        return self.rec_reconstruct_set(self.root_node, [])
+        basic_set_list = self.rec_reconstruct_set(self.root_node, [])
+        print(basic_set_list)
+        final_set = basic_set_list[0]
+        for basic_set in basic_set_list:
+            final_set = final_set.union(basic_set)
+        return final_set
 
     def rec_reconstruct_set(self, curr_node, curr_constraints):
         if curr_node is self.out_node:
             return []
         elif curr_node is self.in_node:
-            bset = islpy.BasicSet.universe(self.get_space())
+            bset = isl.BasicSet.universe(self.get_space())
             for constraint in curr_constraints:
                 bset = bset.add_constraint(constraint)
-            return [bset]
+            if bset.is_empty():
+                return []
+            else:
+                return [bset]
         else:
             curr_constraints.append(curr_node.constraint)
             bsets_from_true = self.rec_reconstruct_set(curr_node.true_branch_node, curr_constraints)
@@ -168,6 +176,7 @@ class Quast:
             curr_constraints.append(self.negate_constraint(curr_node.constraint))
             bsets_from_false = self.rec_reconstruct_set(curr_node.false_branch_node, curr_constraints)
             return bsets_from_true + bsets_from_false
+
 
 class BasicQuast(Quast):
     def __init__(self, basic_set):
@@ -191,11 +200,11 @@ class BasicQuast(Quast):
 
 
 
-A = islpy.BasicSet("{[x,y]: x >= 0 and y >=8 }")
-B = islpy.BasicSet("{[x,y]: y >= 7 }")
+A = isl.BasicSet("{[x,y]: x >= 0 }")
+B = isl.BasicSet("{[x,y]: y >= 7 }")
 a = BasicQuast(A)
 b = BasicQuast(B)
-a.print_tree()
 a.union(b)
+a.print_tree()
 T = a.reconstruct_set()
 print(T)

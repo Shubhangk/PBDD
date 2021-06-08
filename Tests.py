@@ -1,5 +1,5 @@
 # Todo -- remove reference to main
-from main import *
+from Quast import *
 import islpy as isl
 # from Quast import *
 
