@@ -3,11 +3,16 @@ import Quast as Q
 import islpy as isl
 
 
-class MyTestCase(unittest.TestCase):
+class TestQuast(unittest.TestCase):
+    # Description: Function that checks whether two constraints (affine inequalities) are equal by comparing their space
+    # and co-efficients.
+    # @TODO Should be replaced by islpy.Constraint.is_equal() in the future.
     def are_constraints_equal(self, constraint1, constraint2):
         return constraint1.get_space().is_equal(constraint2.get_space()) and (
                     constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
 
+    # Description: Constructs a Quast.Quast from an islpy.Set that is the union of two convex polyhedra. Traverses the
+    # constructed Quast and checks that each node has the expected constraint.
     def test_Quast(self):
         A = isl.Set("{[x,y]: (x >= 0 and y >=8) or (-5 < x < 1 and y < 3)}")
         T = Q.Quast(A)
