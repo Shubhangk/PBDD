@@ -41,12 +41,25 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(test_node.false_branch_node is T.out_node)
         self.assertTrue(test_node.true_branch_node is T.in_node)
 
-    def test_reconstruct_set(self):
+    # Description: Constructs a Quast.Quast from an isl.Set, converts back to the isl.Set representation and checks
+    # whether same as initial set
+    def test_reconstruct_set__0(self):
+        A = isl.Set("{[x]: x >= 0}")
+        T = Q.Quast(A)
+        self.assertTrue(T.reconstruct_set() == A)
+
+    # Description: Constructs a Quast.Quast from an isl.Set, converts back to the isl.Set representation and checks
+    # whether same as initial set
+    def test_reconstruct_set__1(self):
         A = isl.Set("{[x,y]: (x > 0 and y > 4) or (x < -1)}")
         T = Q.Quast(A)
-        # T.print_tree()
-        # print(T.reconstruct_set())
-        # print(A)
+        self.assertTrue(T.reconstruct_set() == A)
+
+    # Description: Constructs a Quast.Quast from an isl.Set, converts back to the isl.Set representation and checks
+    # whether same as initial set
+    def test_reconstruct_set__2(self):
+        A = isl.Set("{[w,x,y,z]: (x > 0 and 2 > w > 9) or (x < -1 and y >= 20) or (x + y > 9 and x + 2z + 3w <= 4)}")
+        T = Q.Quast(A)
         self.assertTrue(T.reconstruct_set() == A)
 
 if __name__ == '__main__':
