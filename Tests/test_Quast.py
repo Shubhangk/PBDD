@@ -41,6 +41,13 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(test_node.false_branch_node is T.out_node)
         self.assertTrue(test_node.true_branch_node is T.in_node)
 
+    def test_reconstruct_set(self):
+        A = isl.Set("{[x,y]: (x > 0 and y > 4) or (x < -1)}")
+        T = Q.Quast(A)
+        # T.print_tree()
+        # print(T.reconstruct_set())
+        # print(A)
+        self.assertTrue(T.reconstruct_set() == A)
 
 if __name__ == '__main__':
     unittest.main()
