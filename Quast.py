@@ -17,7 +17,7 @@ class Quast:
                 if T is None:
                     T = BasicQuast(basic_set)
                 else:
-                    T.union(BasicQuast(basic_set))
+                    T = T.union(BasicQuast(basic_set))
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
@@ -89,6 +89,7 @@ class Quast:
     def union(self, quast):
         union_quast = Quast()
         union_quast.root_node = union_quast.union_trees(node1=self.root_node, node2=quast.root_node)
+        union_quast.set_space(union_quast.root_node.constraint.get_space())
         return union_quast
 
     def union_trees(self, node1, node2):
@@ -188,6 +189,7 @@ class Quast:
             curr_constraints.pop()
             curr_constraints.append(self.negate_constraint(curr_node.constraint))
             bsets_from_false = self.rec_reconstruct_set(curr_node.false_branch_node, curr_constraints)
+            curr_constraints.pop()
             return bsets_from_true + bsets_from_false
 
 
