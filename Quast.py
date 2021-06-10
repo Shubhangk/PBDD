@@ -199,12 +199,14 @@ class BasicQuast(Quast):
         self.in_node = Node(constraint="IN", node_type=Node.IN_NODE)
         self.out_node = Node(constraint="OUT", node_type=Node.OUT_NODE)
         self.root_node = None
+        self.space = None
 
         if basic_set is not None:
             constraints = basic_set.get_constraints()
             if len(constraints) is not 0:
                 self.root_node = Node(constraint=constraints[0], false_branch_node=self.out_node,
                                       true_branch_node=self.add_node(constraints=constraints, i=1))
+                self.space = self.root_node.constraint.get_space()
 
     def add_node(self, constraints, i):
         if i is len(constraints):
