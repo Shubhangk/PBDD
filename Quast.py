@@ -185,12 +185,17 @@ class Quast:
 
 
 class BasicQuast(Quast):
-    def __init__(self, basic_set):
+
+    def __init__(self, basic_set=None):
         self.in_node = Node(constraint="IN", node_type=Node.IN_NODE)
         self.out_node = Node(constraint="OUT", node_type=Node.OUT_NODE)
-        constraints = basic_set.get_constraints()
-        self.root_node = Node(constraint=constraints[0], false_branch_node=self.out_node,
-                              true_branch_node=self.add_node(constraints=constraints, i=1))
+        self.root_node = None
+
+        if basic_set is not None:
+            constraints = basic_set.get_constraints()
+            if len(constraints) is not 0:
+                self.root_node = Node(constraint=constraints[0], false_branch_node=self.out_node,
+                                  true_branch_node=self.add_node(constraints=constraints, i=1))
 
     def add_node(self, constraints, i):
         if i is len(constraints):
@@ -198,3 +203,29 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
+
+    def union(self, quast):
+        union_quast = BasicQuast()
+        union_quast.root_node = union_quast.union_trees(quast1=self, node1=self.root_node, quast2=quast, node2=quast.root_node)
+        return union_quast
+
+    def union_trees(self, quast1, node1, quast2, node2):
+        if node1 is None:
+            if node2.node_type is node2.IN_NODE:
+                return self.in_node
+            elif node2.node_type is node2.OUT_NODE:
+                return self.out_node
+            else:
+                true_branch_node = self.union_trees(quast1=quast1, node1=node1, quast2=quast2,
+                                                    node2=node2.true_branch_node)
+                false_branch_node = self.union_trees(quast1=quast1, node1=node1, quast2=quast2,
+                                                     node2=node2.false_branch_node)
+                return Node(node2.constraint, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
+        if node1.node_type is node1.IN_NODE:
+            return self.in_node
+        elif node1.node_type is node1.OUT_NODE:
+            return self.union_trees(quast1, None, quast2, node2)
+        else:
+            true_branch_node = self.union_trees(quast1=quast1, node1=node1.true_branch_node, quast2=quast2, node2=node2)
+            false_branch_node = self.union_trees(quast1=quast1, node1 = node1.false_branch_node, quast2=quast2, node2=node2)
+            return Node(node1.constraint, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
