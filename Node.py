@@ -1,5 +1,6 @@
 import inspect
 
+
 class Node(object):
     # Constant representing whether/which terminal node
     IN_NODE = 1
@@ -17,7 +18,7 @@ class Node(object):
     # Description: overriding this function should make the class immutable (except at initialization)
     # Reference -- http://www.odosmatthewscoding.com/2018/10/how-to-make-python-class-immutable.html
     def __setattr__(self, *args):
-        if inspect.stack()[1][3] == '__init__':     # allow write on initialization
+        if inspect.stack()[1][3] == '__init__':  # allow write on initialization
             object.__setattr__(self, *args)
         else:
             raise TypeError('Attempting to modify an immutable Node object')

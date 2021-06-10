@@ -2,6 +2,7 @@ import islpy as isl
 
 from Node import *
 
+
 # Description: The Quast class below represents quasts for islpy.Sets
 class Quast:
     in_node = None  # Terminal node indicating containment inside polyhedron
@@ -30,7 +31,6 @@ class Quast:
     def get_parent_list(self, node):
         return self.rec_get_parent_list(node, self.root_node)
 
-
     def rec_get_parent_list(self, target, current):
         if current is target or current is None:
             return []
@@ -56,7 +56,7 @@ class Quast:
     def deepclone(self):
         space = self.get_space()
         clone = Quast(space)
-        clone.root_node = Node(self.root_node.constraint)
+        clone.root_node = Node(self.root_node.constraint, node_type=0)
         copy = {self.root_node: clone.root_node, self.in_node: clone.in_node, self.out_node: clone.out_node}
         self.rec_deepclone(self.root_node, clone.root_node, copy)
         return clone
@@ -68,12 +68,12 @@ class Quast:
 
         if curr_subtree_root.true_branch_node not in copy.keys():
             copy[curr_subtree_root.true_branch_node] = Node(constraint=curr_subtree_root.true_branch_node.constraint,
-                                                            is_terminal=curr_subtree_root.true_branch_node.is_terminal)
+                                                            node_type=0)
         new_subtree_root.true_branch_node = copy[curr_subtree_root.true_branch_node]
 
         if curr_subtree_root.false_branch_node not in copy.keys():
             copy[curr_subtree_root.false_branch_node] = Node(constraint=curr_subtree_root.false_branch_node.constraint,
-                                                             is_terminal=curr_subtree_root.false_branch_node.is_terminal)
+                                                             node_type=0)
         new_subtree_root.false_branch_node = copy[curr_subtree_root.false_branch_node]
         self.rec_deepclone(curr_subtree_root=curr_subtree_root.true_branch_node,
                            new_subtree_root=new_subtree_root.true_branch_node, copy=copy)
@@ -186,20 +186,15 @@ class Quast:
 
 class BasicQuast(Quast):
     def __init__(self, basic_set):
-        self.in_node = Node(constraint="IN", is_terminal=True)
-        self.out_node = Node(constraint="OUT", is_terminal=True)
-        for constraint in basic_set.get_constraints():
-            self.add_node(constraint)
-        self.space = self.root_node.constraint.get_space()
+        self.in_node = Node(constraint="IN", node_type=Node.IN_NODE)
+        self.out_node = Node(constraint="OUT", node_type=Node.OUT_NODE)
+        constraints = basic_set.get_constraints()
+        self.root_node = Node(constraint=constraints[0], false_branch_node=self.out_node,
+                              true_branch_node=self.add_node(constraints=constraints, i=1))
 
-    def add_node(self, constraint):
-        node = Node(constraint)
-        if self.root_node is None:
-            self.root_node = node
-            node.true_branch_node = self.in_node
-            node.false_branch_node = self.out_node
+    def add_node(self, constraints, i):
+        if i is len(constraints):
+            return self.in_node
         else:
-            parent = self.get_parent_list(self.in_node)[0]
-            parent.true_branch_node = node
-            node.true_branch_node = self.in_node
-            node.false_branch_node = self.out_node
+            return Node(constraint=constraints[i], false_branch_node=self.out_node,
+                        true_branch_node=self.add_node(constraints=constraints, i=i + 1))
