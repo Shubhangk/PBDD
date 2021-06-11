@@ -62,5 +62,29 @@ class TestQuast(unittest.TestCase):
         T = Q.Quast(A)
         self.assertTrue(T.reconstruct_set() == A)
 
+    # Description: Constructs a Quast.Quast from an isl.Set, complements the Quast using Quast.complement(),
+    # converts back to isl.Set and checks whether complement of initial set
+    def test_complement__0(self):
+        A = isl.Set("{[x]: x >= 0}")
+        T = Q.Quast(A)
+        T_compl = T.complement()
+        self.assertTrue(T_compl.reconstruct_set() == A.complement())
+
+    # Description: Constructs a Quast.Quast from an isl.Set, complements the Quast using Quast.complement(),
+    # converts back to isl.Set and checks whether complement of initial set
+    def test_complement__1(self):
+        A = isl.Set("{[x,y]: x >= 0 and y <= 9}")
+        T = Q.Quast(A)
+        T_compl = T.complement()
+        self.assertTrue(T_compl.reconstruct_set() == A.complement())
+
+    # Description: Constructs a Quast.Quast from an isl.Set, complements the Quast using Quast.complement(),
+    # converts back to isl.Set and checks whether complement of initial set
+    def test_complement__2(self):
+        A = isl.Set("{[w,x,y,z]: (x >= 0 and y <= 9) or (x + y + z < 7 and x + w > 5 and y - w <= 0) or (w - z >= 20)}")
+        T = Q.Quast(A)
+        T_compl = T.complement()
+        self.assertTrue(T_compl.reconstruct_set() == A.complement())
+
 if __name__ == '__main__':
     unittest.main()

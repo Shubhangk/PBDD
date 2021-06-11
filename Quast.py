@@ -115,25 +115,24 @@ class Quast:
             return Node(constraint=node1.constraint, false_branch_node=false_branch_node,
                         true_branch_node=true_branch_node)
 
-    # Description: complements the current Quast instance
     def complement(self):
-        for node in set(self.get_parent_list(self.in_node)) | set(self.get_parent_list(self.out_node)):
-            if node.true_branch_node is self.in_node:
-                node.true_branch_node = self.out_node
-            elif node.true_branch_node is self.out_node:
-                node.true_branch_node = self.in_node
+        complement_quast = Quast(space=self.get_space())
+        complement_quast.root_node = Node(constraint=self.root_node.constraint,
+                                          true_branch_node=self.complement_tree(self.root_node.true_branch_node,
+                                                                                complement_quast),
+                                          false_branch_node=self.complement_tree(self.root_node.false_branch_node,
+                                                                                 complement_quast))
+        return complement_quast
 
-            if node.false_branch_node is self.in_node:
-                node.false_branch_node = self.out_node
-            elif node.false_branch_node is self.out_node:
-                node.false_branch_node = self.in_node
-
-    # Description: returns a fresh (deep) copy of the complement of current Quast instance
-    # deprecated
-    def get_complement(self):
-        self_copy = self.deepclone()
-        self_copy.complement()
-        return self_copy
+    def complement_tree(self, curr_node, complement_quast):
+        if curr_node == self.in_node:
+            return complement_quast.out_node
+        elif curr_node == self.out_node:
+            return complement_quast.in_node
+        else:
+            return Node(constraint=curr_node.constraint,
+                        true_branch_node=self.complement_tree(curr_node.true_branch_node, complement_quast),
+                        false_branch_node=self.complement_tree(curr_node.false_branch_node, complement_quast))
 
     # Description: intersects the current Quast instance with the quast argument.
     def intersect(self, quast):
@@ -209,23 +208,6 @@ class BasicQuast(Quast):
                 self.root_node = Node(constraint=constraints[0], false_branch_node=self.out_node,
                                       true_branch_node=self.add_node(constraints=constraints, i=1))
                 self.space = self.root_node.constraint.get_space()
-
-    def complement(self):
-        complement_quast = Quast(space=self.get_space())
-        complement_quast.root_node = Node(constraint=self.root_node.constraint,
-                                          true_branch_node=self.complement_tree(self.root_node.true_branch_node, complement_quast),
-                                          false_branch_node=self.complement_tree(self.root_node.false_branch_node, complement_quast))
-        return complement_quast
-
-    def complement_tree(self, curr_node, complement_quast):
-        if curr_node == self.in_node:
-            return complement_quast.out_node
-        elif curr_node == self.out_node:
-            return self.in_node
-        else:
-            return Node(constraint=curr_node.constraint,
-                        true_branch_node=self.complement_tree(curr_node.true_branch_node, complement_quast),
-                        false_branch_node=self.complement_tree(curr_node.false_branch_node, complement_quast))
 
     def add_node(self, constraints, i):
         if i is len(constraints):
