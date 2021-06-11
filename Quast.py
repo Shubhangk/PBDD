@@ -215,3 +215,38 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
+
+    def intersect(self, quast):
+        intersection_quast = BasicQuast()
+        intersection_quast.root_node = intersection_quast.intersect_trees(node1=self.root_node, node2=quast.root_node)
+        intersection_quast.set_space(intersection_quast.root_node.constraint.get_space())
+        return intersection_quast
+
+    def intersect_trees(self, node1, node2):
+        if node1 is None:
+            if node2.node_type is node2.IN_NODE:
+                return self.in_node
+            elif node2.node_type is node2.OUT_NODE:
+                return self.out_node
+            else:
+                true_branch_node = self.intersect_trees(node1=node1, node2=node2.true_branch_node)
+                false_branch_node = self.intersect_trees(node1=node1, node2=node2.false_branch_node)
+                return Node(constraint=node2.constraint, false_branch_node=false_branch_node,
+                            true_branch_node=true_branch_node)
+        if node1.node_type is node1.IN_NODE:
+            return self.intersect_trees(node1=None, node2=node2)
+        elif node1.node_type is node1.OUT_NODE:
+            return self.out_node
+        else:
+            true_branch_node = self.intersect_trees(node1=node1.true_branch_node, node2=node2)
+            false_branch_node = self.intersect_trees(node1=node1.false_branch_node, node2=node2)
+            return Node(constraint=node1.constraint, false_branch_node=false_branch_node,
+                        true_branch_node=true_branch_node)
+
+
+A = isl.BasicSet("{[x,y]: x >= 0}")
+a = BasicQuast(A)
+B = isl.BasicSet("{[x,y]: y >= 0}")
+b = BasicQuast(B)
+C = a.intersect(b)
+print(C.reconstruct_set() == A.intersect(B))
