@@ -10,7 +10,7 @@ class Quast:
     root_node = None  # Root node of the QUAST
     space = None
 
-    def __init__(self, set=None):
+    def __init__(self, set=None, space=None):
         if set is not None:
             T = None
             for basic_set in set.get_basic_sets():
@@ -21,11 +21,13 @@ class Quast:
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
-            self.set_space(T.get_space())
+            if space is None:
+                space = T.get_space()
+            self.set_space(space)
         else:
             self.in_node = Node(constraint="IN", node_type=Node.IN_NODE)
             self.out_node = Node(constraint="OUT", node_type=Node.OUT_NODE)
-            self.set_space(None)
+            self.set_space(space)
             self.root_node = None
 
     def get_space(self):
@@ -207,6 +209,23 @@ class BasicQuast(Quast):
                 self.root_node = Node(constraint=constraints[0], false_branch_node=self.out_node,
                                       true_branch_node=self.add_node(constraints=constraints, i=1))
                 self.space = self.root_node.constraint.get_space()
+
+    def complement(self):
+        complement_quast = Quast(space=self.get_space())
+        complement_quast.root_node = Node(constraint=self.root_node.constraint,
+                                          true_branch_node=self.complement_tree(self.root_node.true_branch_node, complement_quast),
+                                          false_branch_node=self.complement_tree(self.root_node.false_branch_node, complement_quast))
+        return complement_quast
+
+    def complement_tree(self, curr_node, complement_quast):
+        if curr_node == self.in_node:
+            return complement_quast.out_node
+        elif curr_node == self.out_node:
+            return self.in_node
+        else:
+            return Node(constraint=curr_node.constraint,
+                        true_branch_node=self.complement_tree(curr_node.true_branch_node, complement_quast),
+                        false_branch_node=self.complement_tree(curr_node.false_branch_node, complement_quast))
 
     def add_node(self, constraints, i):
         if i is len(constraints):
