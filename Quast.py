@@ -37,99 +37,101 @@ class Quast:
         self.space = new_space
 
     def get_parent_list(self, node):
-        return self.rec_get_parent_list(node, self.root_node)
+        return self.__get_parent_list(node, self.root_node)
 
-    def rec_get_parent_list(self, target, current):
+    # Description: Checks whether current node is a parent of target and continues recursively searching in
+    # children of current. Returns a list of all parents
+    def __get_parent_list(self, target, current):
         if current is target or current is None:
             return []
         is_current_parent = []
         if current.true_branch_node is target or current.false_branch_node is target:
             is_current_parent = [current]
-        parents_from_true_branch = self.rec_get_parent_list(target, current.true_branch_node)
-        parents_from_false_branch = self.rec_get_parent_list(target, current.false_branch_node)
+        parents_from_true_branch = self.__get_parent_list(target, current.true_branch_node)
+        parents_from_false_branch = self.__get_parent_list(target, current.false_branch_node)
         return parents_from_true_branch + parents_from_false_branch + is_current_parent
 
     def union(self, quast):
         union_quast = Quast()
-        union_quast.root_node = union_quast.union_trees(node1=self.root_node, node2=quast.root_node)
+        union_quast.root_node = union_quast.__union(node1=self.root_node, node2=quast.root_node)
         union_quast.set_space(union_quast.root_node.constraint.get_space())
         return union_quast
 
-    def union_trees(self, node1, node2):
+    def __union(self, node1, node2):
         if node1 is None:
             if node2.node_type is node2.IN_NODE:
                 return self.in_node
             elif node2.node_type is node2.OUT_NODE:
                 return self.out_node
             else:
-                true_branch_node = self.union_trees(node1=node1, node2=node2.true_branch_node)
-                false_branch_node = self.union_trees(node1=node1, node2=node2.false_branch_node)
+                true_branch_node = self.__union(node1=node1, node2=node2.true_branch_node)
+                false_branch_node = self.__union(node1=node1, node2=node2.false_branch_node)
                 return Node(constraint=node2.constraint, false_branch_node=false_branch_node,
                             true_branch_node=true_branch_node)
         if node1.node_type is node1.IN_NODE:
             return self.in_node
         elif node1.node_type is node1.OUT_NODE:
-            return self.union_trees(node1=None, node2=node2)
+            return self.__union(node1=None, node2=node2)
         else:
-            true_branch_node = self.union_trees(node1=node1.true_branch_node, node2=node2)
-            false_branch_node = self.union_trees(node1=node1.false_branch_node, node2=node2)
+            true_branch_node = self.__union(node1=node1.true_branch_node, node2=node2)
+            false_branch_node = self.__union(node1=node1.false_branch_node, node2=node2)
             return Node(constraint=node1.constraint, false_branch_node=false_branch_node,
                         true_branch_node=true_branch_node)
 
     def complement(self):
         complement_quast = Quast(space=self.get_space())
         complement_quast.root_node = Node(constraint=self.root_node.constraint,
-                                          true_branch_node=self.complement_tree(self.root_node.true_branch_node,
+                                          true_branch_node=self.__complement(self.root_node.true_branch_node,
                                                                                 complement_quast),
-                                          false_branch_node=self.complement_tree(self.root_node.false_branch_node,
+                                          false_branch_node=self.__complement(self.root_node.false_branch_node,
                                                                                  complement_quast))
         return complement_quast
 
-    def complement_tree(self, curr_node, complement_quast):
+    def __complement(self, curr_node, complement_quast):
         if curr_node == self.in_node:
             return complement_quast.out_node
         elif curr_node == self.out_node:
             return complement_quast.in_node
         else:
             return Node(constraint=curr_node.constraint,
-                        true_branch_node=self.complement_tree(curr_node.true_branch_node, complement_quast),
-                        false_branch_node=self.complement_tree(curr_node.false_branch_node, complement_quast))
+                        true_branch_node=self.__complement(curr_node.true_branch_node, complement_quast),
+                        false_branch_node=self.__complement(curr_node.false_branch_node, complement_quast))
 
     def intersect(self, quast):
         intersection_quast = Quast()
-        intersection_quast.root_node = intersection_quast.intersect_trees(node1=self.root_node, node2=quast.root_node)
+        intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node)
         intersection_quast.set_space(intersection_quast.root_node.constraint.get_space())
         return intersection_quast
 
-    def intersect_trees(self, node1, node2):
+    def __intersect(self, node1, node2):
         if node1 is None:
             if node2.node_type is node2.IN_NODE:
                 return self.in_node
             elif node2.node_type is node2.OUT_NODE:
                 return self.out_node
             else:
-                true_branch_node = self.intersect_trees(node1=node1, node2=node2.true_branch_node)
-                false_branch_node = self.intersect_trees(node1=node1, node2=node2.false_branch_node)
+                true_branch_node = self.__intersect(node1=node1, node2=node2.true_branch_node)
+                false_branch_node = self.__intersect(node1=node1, node2=node2.false_branch_node)
                 return Node(constraint=node2.constraint, false_branch_node=false_branch_node,
                             true_branch_node=true_branch_node)
         if node1.node_type is node1.IN_NODE:
-            return self.intersect_trees(node1=None, node2=node2)
+            return self.__intersect(node1=None, node2=node2)
         elif node1.node_type is node1.OUT_NODE:
             return self.out_node
         else:
-            true_branch_node = self.intersect_trees(node1=node1.true_branch_node, node2=node2)
-            false_branch_node = self.intersect_trees(node1=node1.false_branch_node, node2=node2)
+            true_branch_node = self.__intersect(node1=node1.true_branch_node, node2=node2)
+            false_branch_node = self.__intersect(node1=node1.false_branch_node, node2=node2)
             return Node(constraint=node1.constraint, false_branch_node=false_branch_node,
                         true_branch_node=true_branch_node)
 
     def reconstruct_set(self):
-        basic_set_list = self.rec_reconstruct_set(self.root_node, [])
+        basic_set_list = self.__reconstruct_set(self.root_node, [])
         final_set = basic_set_list[0]
         for basic_set in basic_set_list:
             final_set = final_set.union(basic_set)
         return final_set
 
-    def rec_reconstruct_set(self, curr_node, curr_constraints):
+    def __reconstruct_set(self, curr_node, curr_constraints):
         if curr_node is self.out_node:
             return []
         elif curr_node is self.in_node:
@@ -142,10 +144,10 @@ class Quast:
                 return [bset]
         else:
             curr_constraints.append(curr_node.constraint)
-            bsets_from_true = self.rec_reconstruct_set(curr_node.true_branch_node, curr_constraints)
+            bsets_from_true = self.__reconstruct_set(curr_node.true_branch_node, curr_constraints)
             curr_constraints.pop()
             curr_constraints.append(self.negate_constraint(curr_node.constraint))
-            bsets_from_false = self.rec_reconstruct_set(curr_node.false_branch_node, curr_constraints)
+            bsets_from_false = self.__reconstruct_set(curr_node.false_branch_node, curr_constraints)
             curr_constraints.pop()
             return bsets_from_true + bsets_from_false
 
@@ -160,45 +162,15 @@ class Quast:
 
     # Description: proxy function for recursively printing QUAST level-by-level
     def print_tree(self):
-        self.rec_print_tree(node=self.root_node, level=0)
+        self.__print_tree(node=self.root_node, level=0)
 
     # Reference -- https://stackoverflow.com/questions/34012886/print-binary-tree-level-by-level-in-python
     # Description: Recursively prints QUAST level-by-level
-    def rec_print_tree(self, node, level):
+    def __print_tree(self, node, level):
         if node is not None:
-            self.rec_print_tree(node.true_branch_node, level + 1)
+            self.__print_tree(node.true_branch_node, level + 1)
             print(' ' * 5 * level + '--->', node.constraint)
-            self.rec_print_tree(node.false_branch_node, level + 1)
-
-    def deepclone(self):
-        space = self.get_space()
-        clone = Quast(space)
-        clone.root_node = Node(self.root_node.constraint, node_type=0)
-        copy = {self.root_node: clone.root_node, self.in_node: clone.in_node, self.out_node: clone.out_node}
-        self.rec_deepclone(self.root_node, clone.root_node, copy)
-        return clone
-
-    def rec_deepclone(self, curr_subtree_root, new_subtree_root, copy):
-        # base case
-        if curr_subtree_root.is_terminal:
-            return
-
-        if curr_subtree_root.true_branch_node not in copy.keys():
-            copy[curr_subtree_root.true_branch_node] = Node(
-                constraint=curr_subtree_root.true_branch_node.constraint,
-                node_type=0)
-        new_subtree_root.true_branch_node = copy[curr_subtree_root.true_branch_node]
-
-        if curr_subtree_root.false_branch_node not in copy.keys():
-            copy[curr_subtree_root.false_branch_node] = Node(
-                constraint=curr_subtree_root.false_branch_node.constraint,
-                node_type=0)
-        new_subtree_root.false_branch_node = copy[curr_subtree_root.false_branch_node]
-        self.rec_deepclone(curr_subtree_root=curr_subtree_root.true_branch_node,
-                           new_subtree_root=new_subtree_root.true_branch_node, copy=copy)
-        self.rec_deepclone(curr_subtree_root=curr_subtree_root.false_branch_node,
-                           new_subtree_root=new_subtree_root.false_branch_node, copy=copy)
-
+            self.__print_tree(node.false_branch_node, level + 1)
 
 class BasicQuast(Quast):
 
