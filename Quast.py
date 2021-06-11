@@ -149,6 +149,15 @@ class Quast:
             curr_constraints.pop()
             return bsets_from_true + bsets_from_false
 
+    def negate_constraint(self, constraint):
+        coefficients = constraint.get_coefficients_by_name()
+        for var in coefficients.keys():
+            coefficients[var] = coefficients[var].neg()
+
+        negated_constraint = constraint.set_coefficients_by_name(coefficients)
+        negated_constraint = negated_constraint.set_constant_val(negated_constraint.get_constant_val() - 1)
+        return negated_constraint
+
     # Description: proxy function for recursively printing QUAST level-by-level
     def print_tree(self):
         self.rec_print_tree(node=self.root_node, level=0)
