@@ -86,5 +86,22 @@ class TestQuast(unittest.TestCase):
         T_compl = T.complement()
         self.assertTrue(T_compl.reconstruct_set() == A.complement())
 
+    def test_intersect__0(self):
+        A = isl.Set("{[x, y]: x >= 0}")
+        B = isl.Set("{[x, y]: y >= 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        intersection_quast = a.intersect(b)
+        self.assertTrue(intersection_quast.reconstruct_set() == A.intersect(B))
+
+    def test_intersect__1(self):
+        A = isl.Set("{[x, y, z]: x >= 0 and y <= 9 or (x + z <= 8 and y + z >= 9)}")
+        B = isl.Set("{[x, y, z]: y >= 0 and x + y + z <= 10}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        intersection_quast = a.intersect(b)
+        self.assertTrue(intersection_quast.reconstruct_set() == A.intersect(B))
+
+
 if __name__ == '__main__':
     unittest.main()
