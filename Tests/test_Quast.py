@@ -102,6 +102,21 @@ class TestQuast(unittest.TestCase):
         intersection_quast = a.intersect(b)
         self.assertTrue(intersection_quast.reconstruct_set() == A.intersect(B))
 
+    def test_union__0(self):
+        A = isl.Set("{[x, y]: x >= 0}")
+        B = isl.Set("{[x, y]: y >= 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        union_quast = a.union(b)
+        self.assertTrue(union_quast.reconstruct_set() == A.union(B))
+
+    def test_union__1(self):
+        A = isl.Set("{[x, y, z]: x >= 0 and y <= 9 or (x + z <= 8 and y + z >= 9)}")
+        B = isl.Set("{[x, y, z]: y >= 0 and x + y + z <= 10}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        union_quast = a.union(b)
+        self.assertTrue(union_quast.reconstruct_set() == A.union(B))
 
 if __name__ == '__main__':
     unittest.main()
