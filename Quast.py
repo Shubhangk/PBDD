@@ -1,5 +1,5 @@
 import islpy as isl
-from graphviz import *
+from graphviz import Digraph
 from Node import *
 
 
