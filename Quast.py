@@ -1,5 +1,5 @@
 import islpy as isl
-
+from graphviz import *
 from Node import *
 
 
@@ -171,6 +171,23 @@ class Quast:
             self.__print_tree(node.true_branch_node, level + 1)
             print(' ' * 5 * level + '--->', node.constraint)
             self.__print_tree(node.false_branch_node, level + 1)
+
+    def visualize_tree(self):
+        dot = Digraph(format="pdf", comment='Quast Visualization')
+        self.__visualize_tree(dot, self.root_node)
+        dot.render('visualization-output/quast', view=True)
+
+    def __visualize_tree(self, dot, node):
+        if node.is_terminal():
+            return
+        else:
+            dot.edge(self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.true_branch_node.constraint), label="T")
+            dot.edge(self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.false_branch_node.constraint), label="F")
+            self.__visualize_tree(dot, node.true_branch_node)
+            self.__visualize_tree(dot, node.false_branch_node)
+
+    def __get_visualization_label(self, constraint):
+        return str(constraint).split(":")[-1].split("}")[0]
 
 class BasicQuast(Quast):
 
