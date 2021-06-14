@@ -174,17 +174,26 @@ class Quast:
 
     def visualize_tree(self):
         dot = Digraph(format="pdf", comment='Quast Visualization')
-        self.__visualize_tree(dot, self.root_node)
+        arcs = {}
+        self.__visualize_tree(arcs, self.root_node)
+        for arc in arcs.keys():
+            print(arc)
+            dot.edge(arc[0], arc[1], label=arcs[arc])
+        print(dot.source)
         dot.render('visualization-output/quast', view=True)
 
-    def __visualize_tree(self, dot, node):
+    def __visualize_tree(self, arcs, node):
         if node.is_terminal():
             return
         else:
-            dot.edge(self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.true_branch_node.constraint), label="T")
-            dot.edge(self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.false_branch_node.constraint), label="F")
-            self.__visualize_tree(dot, node.true_branch_node)
-            self.__visualize_tree(dot, node.false_branch_node)
+            true_branch_arc = (self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.true_branch_node.constraint))
+            if true_branch_arc not in arcs:
+                arcs[true_branch_arc] = "T"
+            false_branch_arc = (self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.false_branch_node.constraint))
+            if false_branch_arc not in arcs:
+                arcs[false_branch_arc] = "F"
+            self.__visualize_tree(arcs, node.true_branch_node)
+            self.__visualize_tree(arcs, node.false_branch_node)
 
     def __get_visualization_label(self, constraint):
         return str(constraint).split(":")[-1].split("}")[0]
