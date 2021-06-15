@@ -37,21 +37,6 @@ class Quast:
     def set_space(self, new_space):
         self.space = new_space
 
-    def get_parent_list(self, node):
-        return self.__get_parent_list(node, self.root_node)
-
-    # Description: Checks whether current node is a parent of target and continues recursively searching in
-    # children of current. Returns a list of all parents
-    def __get_parent_list(self, target, current):
-        if current is target or current is None:
-            return []
-        is_current_parent = []
-        if current.true_branch_node is target or current.false_branch_node is target:
-            is_current_parent = [current]
-        parents_from_true_branch = self.__get_parent_list(target, current.true_branch_node)
-        parents_from_false_branch = self.__get_parent_list(target, current.false_branch_node)
-        return parents_from_true_branch + parents_from_false_branch + is_current_parent
-
     def union(self, quast):
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
@@ -200,6 +185,28 @@ class Quast:
 
     def __get_visualization_label(self, constraint):
         return str(constraint).split(":")[-1].split("}")[0]
+
+    def __get_parent_list(self, target, current=None):
+        if current is None:
+            current = self.root_node    # should only execute during the top level recursive call
+        elif current is target:
+            return []   # target can never be its own parent in future recursive calls as the Quast is a DAG
+
+        is_current_parent = []
+        if current.true_branch_node is target or current.false_branch_node is target:
+            is_current_parent = [current]
+
+        if current.true_branch_node is not None:
+            parents_from_true_branch = self.__get_parent_list(target, current.true_branch_node)
+        else:
+            parents_from_true_branch = []
+
+        if current.false_branch_node is not None:
+            parents_from_false_branch = self.__get_parent_list(target, current.false_branch_node)
+        else:
+            parents_from_false_branch = []
+
+        return parents_from_true_branch + parents_from_false_branch + is_current_parent
 
 class BasicQuast(Quast):
 
