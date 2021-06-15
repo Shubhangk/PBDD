@@ -1,3 +1,4 @@
+import islpy
 import islpy as isl
 from graphviz import Digraph
 from Node import *
@@ -52,9 +53,10 @@ class Quast:
         return parents_from_true_branch + parents_from_false_branch + is_current_parent
 
     def union(self, quast):
-        union_quast = Quast()
+        if self.get_space() != quast.get_space():
+            raise Exception("spaces don't match")
+        union_quast = Quast(space=self.get_space())
         union_quast.root_node = union_quast.__union(node1=self.root_node, node2=quast.root_node)
-        union_quast.set_space(union_quast.root_node.constraint.get_space())
         return union_quast
 
     def __union(self, node1, node2):
@@ -98,9 +100,10 @@ class Quast:
                         false_branch_node=self.__complement(curr_node.false_branch_node, complement_quast))
 
     def intersect(self, quast):
-        intersection_quast = Quast()
+        if self.get_space() != quast.get_space():
+            raise Exception("spaces don't match")
+        intersection_quast = Quast(space=self.get_space())
         intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node)
-        intersection_quast.set_space(intersection_quast.root_node.constraint.get_space())
         return intersection_quast
 
     def __intersect(self, node1, node2):
