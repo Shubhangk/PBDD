@@ -9,7 +9,7 @@ class TestQuast(unittest.TestCase):
     # @TODO Should be replaced by islpy.Constraint.is_equal() in the future.
     def are_constraints_equal(self, constraint1, constraint2):
         return constraint1.get_space() == constraint2.get_space() and (
-                    constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
+                constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
 
     # Description: Constructs a Quast.Quast from an islpy.Set that is the union of two polyhedra. Traverses the
     # constructed Quast (in a depth-first manner) and checks that each node has the expected constraint.
@@ -24,7 +24,8 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(
             self.are_constraints_equal(isl.Constraint.ineq_from_names(space, {1: -8, "y": 1}), test_node.constraint))
         self.assertTrue(
-            self.are_constraints_equal(isl.Constraint.ineq_from_names(space, {1: 4, "x": 1}), test_node.false_branch_node.constraint))
+            self.are_constraints_equal(isl.Constraint.ineq_from_names(space, {1: 4, "x": 1}),
+                                       test_node.false_branch_node.constraint))
         test_node = test_node.true_branch_node
         self.assertTrue(test_node is T.in_node)
         test_node = T.root_node.false_branch_node
@@ -117,6 +118,16 @@ class TestQuast(unittest.TestCase):
         b = Q.Quast(B)
         union_quast = a.union(b)
         self.assertTrue(union_quast.reconstruct_set() == A.union(B))
+
+    def test_prune_empty_branches__0(self):
+        A = isl.Set("{[x]: x <= -2 or (x > 0)}")
+        B = isl.Set("{[x]: x < 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = a.intersect(b)
+        c.prune_empty_branches()
+        self.assertTrue(c.reconstruct_set() == A.intersect(B))
+
 
 if __name__ == '__main__':
     unittest.main()
