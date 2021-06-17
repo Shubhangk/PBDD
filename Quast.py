@@ -48,9 +48,9 @@ class Quast:
         complement_quast = Quast(space=self.get_space())
         complement_quast.root_node = Node(constraint=self.root_node.constraint,
                                           true_branch_node=self.__complement(self.root_node.true_branch_node,
-                                                                                complement_quast),
+                                                                             complement_quast),
                                           false_branch_node=self.__complement(self.root_node.false_branch_node,
-                                                                                 complement_quast))
+                                                                              complement_quast))
         return complement_quast
 
     def intersect(self, quast):
@@ -174,10 +174,12 @@ class Quast:
         if node.is_terminal():
             return
         else:
-            true_branch_arc = (self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.true_branch_node.constraint))
+            true_branch_arc = (self.__get_visualization_label(node.constraint),
+                               self.__get_visualization_label(node.true_branch_node.constraint))
             if true_branch_arc not in arcs:
                 arcs[true_branch_arc] = "T"
-            false_branch_arc = (self.__get_visualization_label(node.constraint), self.__get_visualization_label(node.false_branch_node.constraint))
+            false_branch_arc = (self.__get_visualization_label(node.constraint),
+                                self.__get_visualization_label(node.false_branch_node.constraint))
             if false_branch_arc not in arcs:
                 arcs[false_branch_arc] = "F"
             self.__visualize_tree(arcs, node.true_branch_node)
@@ -188,9 +190,9 @@ class Quast:
 
     def __get_parent_list(self, target, current=None):
         if current is None:
-            current = self.root_node    # should only execute during the top level recursive call
+            current = self.root_node  # should only execute during the top level recursive call
         elif current is target:
-            return []   # target can never be its own parent in future recursive calls as the Quast is a DAG
+            return []  # target can never be its own parent in future recursive calls as the Quast is a DAG
 
         is_current_parent = []
         if current.true_branch_node is target or current.false_branch_node is target:
@@ -207,6 +209,59 @@ class Quast:
             parents_from_false_branch = []
 
         return parents_from_true_branch + parents_from_false_branch + is_current_parent
+
+    def __is_constraint_valid(self, constraint, constraint_list):
+        bset = isl.BasicSet.universe(self.get_space()).add_constraints(constraint_list)
+        halfspace = isl.BasicSet.from_constraint(constraint)
+        return bset.is_subset(halfspace)
+
+    def prune_empty_branches(self):
+        self.__prune_empty_branches(self.root_node, [], [])
+
+    def __prune_empty_branches(self, node, root_to_node_path, constraint_list):
+        if node.is_terminal():
+            return
+        elif self.__is_constraint_valid(node.constraint, constraint_list):
+            root_to_node_path.append([node, False])
+            self.__prune_branch(root_to_node_path, i=0)
+            root_to_node_path.pop()
+            root_to_node_path.append([node, True])
+            constraint_list.append(node.constraint)
+            self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
+            constraint_list.pop()
+            root_to_node_path.pop()
+        elif self.__is_constraint_valid(self.__negate_constraint(node.constraint), constraint_list):
+            root_to_node_path.append([node, True])
+            self.__prune_branch(root_to_node_path, i=0)
+            root_to_node_path.pop()
+            root_to_node_path.append([node, False])
+            constraint_list.append(self.__negate_constraint(node.constraint))
+            self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
+            constraint_list.pop()
+            root_to_node_path.pop()
+        else:
+            constraint_list.append(node.constraint)
+            root_to_node_path.append([node, True])
+            self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
+            constraint_list.pop()
+            root_to_node_path.pop()
+            constraint_list.append(self.__negate_constraint(node.constraint))
+            root_to_node_path.append([node, False])
+            self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
+            constraint_list.pop()
+            root_to_node_path.pop()
+
+    def __prune_branch(self, root_to_node_path, i):
+        node, branch = root_to_node_path[i][0], root_to_node_path[i][1]
+        if i == len(root_to_node_path) - 1:
+            return node.false_branch_node if branch is True else node.true_branch_node
+        else:
+            new_true_branch_node = self.__prune_branch(root_to_node_path, i+1) if branch is True else node.true_branch_node
+            new_false_branch_node = self.__prune_branch(root_to_node_path, i+1) if branch is False else node.false_branch_node
+            new_node = Node(constraint=node.constraint, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
+            if i == 0:
+                self.root_node = new_node
+            return new_node
 
 class BasicQuast(Quast):
 
