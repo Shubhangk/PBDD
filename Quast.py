@@ -73,11 +73,11 @@ class Quast:
 
     def visualize_tree(self):
         dot = Digraph(format="pdf", comment='Quast Visualization')
-        arcs = {}
+        arcs = set()
         self.__visualize_tree(arcs, self.root_node)
-        for arc in arcs.keys():
+        for arc in arcs:
             print(arc)
-            dot.edge(arc[0], arc[1], label=arcs[arc])
+            dot.edge(arc[0], arc[1], label=arc[2])
         print(dot.source)
         dot.render('visualization-output/quast', view=True)
 
@@ -175,13 +175,11 @@ class Quast:
             return
         else:
             true_branch_arc = (self.__get_visualization_label(node.constraint),
-                               self.__get_visualization_label(node.true_branch_node.constraint))
-            if true_branch_arc not in arcs:
-                arcs[true_branch_arc] = "T"
+                               self.__get_visualization_label(node.true_branch_node.constraint), "T")
             false_branch_arc = (self.__get_visualization_label(node.constraint),
-                                self.__get_visualization_label(node.false_branch_node.constraint))
-            if false_branch_arc not in arcs:
-                arcs[false_branch_arc] = "F"
+                                self.__get_visualization_label(node.false_branch_node.constraint), "F")
+            arcs.add(true_branch_arc)
+            arcs.add(false_branch_arc)
             self.__visualize_tree(arcs, node.true_branch_node)
             self.__visualize_tree(arcs, node.false_branch_node)
 
