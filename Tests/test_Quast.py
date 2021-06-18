@@ -70,7 +70,6 @@ class TestQuast(unittest.TestCase):
         b = Q.Quast(B)
         c = a.intersect(b)
         c.prune_same_constraint_nodes()
-        c.visualize_tree()
         self.assertTrue(c.reconstruct_set() == A.intersect(B))
 
     # Description: Constructs a Quast.Quast from an isl.Set, complements the Quast using Quast.complement(),
@@ -163,6 +162,22 @@ class TestQuast(unittest.TestCase):
         c = Q.Quast(A1).intersect(Q.Quast(A2))
         c.prune_same_constraint_nodes()
         self.assertTrue(c.reconstruct_set() == A1.intersect(A2))
+
+    def test_is_equal__0(self):
+        A1 = isl.Set("{[x,y]: x >= 0 or ( x + y <= 0)}")
+        A2 = isl.Set("{[x,y]: x < 0}")
+        A3 = isl.Set("{[x,y]: x + y <= 0}")
+        a1 = Q.Quast(A1)
+        a23 = Q.Quast(A2).complement().union(Q.Quast(A3))
+        self.assertTrue(a1.is_equal(a23))
+
+    def test_is_empty__0(self):
+        A1 = isl.Set("{[x,y]: x >= 0}")
+        A2 = isl.Set("{[x,y]: x < 0}")
+        a1 = Q.Quast(A1)
+        a2 = Q.Quast(A2)
+        self.assertTrue(a1.intersect(a2).is_empty())
+
 
 if __name__ == '__main__':
     unittest.main()
