@@ -63,6 +63,16 @@ class TestQuast(unittest.TestCase):
         T = Q.Quast(A)
         self.assertTrue(T.reconstruct_set() == A)
 
+    def test_reconstruct_set__3(self):
+        A = isl.Set("{[x]: x >= 0}")
+        B = isl.Set("{[x]: x < 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = a.intersect(b)
+        c.prune_same_constraint_nodes()
+        c.visualize_tree()
+        self.assertTrue(c.reconstruct_set() == A.intersect(B))
+
     # Description: Constructs a Quast.Quast from an isl.Set, complements the Quast using Quast.complement(),
     # converts back to isl.Set and checks whether complement of initial set
     def test_complement__0(self):
