@@ -62,7 +62,7 @@ class Quast:
 
     def reconstruct_set(self):
         basic_set_list = self.__reconstruct_set(self.root_node, [])
-        final_set = basic_set_list[0]
+        final_set = basic_set_list[0] if len(basic_set_list) > 0 else isl.BasicSet.empty(self.get_space())
         for basic_set in basic_set_list:
             final_set = final_set.union(basic_set)
         return final_set
@@ -132,6 +132,8 @@ class Quast:
                 return []
             else:
                 return [bset]
+        elif curr_node.true_branch_node is curr_node.false_branch_node:
+            return self.__reconstruct_set(curr_node.true_branch_node, curr_constraints)
         else:
             curr_constraints.append(curr_node.constraint)
             bsets_from_true = self.__reconstruct_set(curr_node.true_branch_node, curr_constraints)
