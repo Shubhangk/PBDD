@@ -41,7 +41,7 @@ class Quast:
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
         union_quast = Quast(space=self.get_space())
-        union_quast.root_node = union_quast.__union(node1=self.root_node, node2=quast.root_node)
+        union_quast.root_node = union_quast.__union(node1=self.root_node, node2=quast.root_node, new_node2=[None])
         return union_quast
 
     def complement(self):
@@ -155,24 +155,26 @@ class Quast:
             print(' ' * 5 * level + '--->', node.constraint)
             self.__print_tree(node.false_branch_node, level + 1)
 
-    def __union(self, node1, node2):
+    def __union(self, node1, node2, new_node2):
         if node1 is None:
             if node2.node_type is node2.IN_NODE:
                 return self.in_node
             elif node2.node_type is node2.OUT_NODE:
                 return self.out_node
             else:
-                true_branch_node = self.__union(node1=node1, node2=node2.true_branch_node)
-                false_branch_node = self.__union(node1=node1, node2=node2.false_branch_node)
+                true_branch_node = self.__union(node1=node1, node2=node2.true_branch_node, new_node2=new_node2)
+                false_branch_node = self.__union(node1=node1, node2=node2.false_branch_node, new_node2=new_node2)
                 return Node(constraint=node2.constraint, false_branch_node=false_branch_node,
                             true_branch_node=true_branch_node)
         if node1.node_type is node1.IN_NODE:
             return self.in_node
         elif node1.node_type is node1.OUT_NODE:
-            return self.__union(node1=None, node2=node2)
+            if new_node2[0] is None:
+                new_node2[0] = self.__union(node1=None, node2=node2, new_node2=new_node2)
+            return new_node2[0]
         else:
-            true_branch_node = self.__union(node1=node1.true_branch_node, node2=node2)
-            false_branch_node = self.__union(node1=node1.false_branch_node, node2=node2)
+            true_branch_node = self.__union(node1=node1.true_branch_node, node2=node2, new_node2=new_node2)
+            false_branch_node = self.__union(node1=node1.false_branch_node, node2=node2, new_node2=new_node2)
             return Node(constraint=node1.constraint, false_branch_node=false_branch_node,
                         true_branch_node=true_branch_node)
 
