@@ -300,6 +300,28 @@ class Quast:
         return constraint1.get_space() == constraint2.get_space() and (
                 constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
 
+    def is_empty(self):
+        return self.reconstruct_set().is_empty()
+
+    def is_equal(self, quast):
+        return self.reconstruct_set() == quast.reconstruct_set()
+
+    def apply(self):
+        # Todo -- Need to complete.
+        return None
+
+    def project_out(self):
+        # Todo -- Need to complete.
+        return None
+
+    def lexmin(self):
+        # Todo -- Need to complete.
+        return None
+
+    def lexmax(self):
+        # Todo -- Need to complete.
+        return None
+
 class BasicQuast(Quast):
 
     def __init__(self, basic_set=None):
@@ -321,25 +343,3 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
-
-    def is_empty(self):
-        return self.reconstruct_set().is_empty()
-
-    def is_equal(self, quast):
-        return self.reconstruct_set().is_equal == quast.reconstruct_set()
-
-    def apply(self):
-        # Todo -- Need to complete.
-        return None
-
-    def project_out(self):
-        # Todo -- Need to complete.
-        return None
-
-    def lexmin(self):
-        # Todo -- Need to complete.
-        return None
-
-    def lexmax(self):
-        # Todo -- Need to complete.
-        return None
