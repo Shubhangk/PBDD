@@ -321,3 +321,25 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
+
+    def is_empty(self):
+        return self.reconstruct_set().is_empty()
+
+    def is_equal(self, quast):
+        return self.reconstruct_set().is_equal == quast.reconstruct_set()
+
+    def apply(self):
+        # Todo -- Need to complete.
+        return None
+
+    def project_out(self):
+        # Todo -- Need to complete.
+        return None
+
+    def lexmin(self):
+        # Todo -- Need to complete.
+        return None
+
+    def lexmax(self):
+        # Todo -- Need to complete.
+        return None
