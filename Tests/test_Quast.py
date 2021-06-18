@@ -137,5 +137,22 @@ class TestQuast(unittest.TestCase):
         c.prune_empty_branches()
         self.assertTrue(c.reconstruct_set() == A.intersect(B))
 
+    def test_prune_same_constraint_nodes__0(self):
+        A1 = isl.Set("{[x,y]: x >= 0}")
+        A2 = isl.Set("{[x,y]: x >= 0}")
+        A3 = isl.Set("{[x,y]: x >= 0}")
+        A4 = isl.Set("{[x,y]: x >= 0}")
+        A5 = isl.Set("{[x,y]: x >= 0}")
+        c = Q.Quast(A1).intersect(Q.Quast(A2)).intersect(Q.Quast(A3)).intersect(Q.Quast(A4)).intersect(Q.Quast(A5))
+        c.prune_same_constraint_nodes()
+        self.assertTrue(c.reconstruct_set() == A1)
+
+    def test_prune_same_constraint_nodes__1(self):
+        A1 = isl.Set("{[x,y]: x >= 0 or ( x + y <= 0)}")
+        A2 = isl.Set("{[x,y]: x + y > 0}")
+        c = Q.Quast(A1).intersect(Q.Quast(A2))
+        c.prune_same_constraint_nodes()
+        self.assertTrue(c.reconstruct_set() == A1.intersect(A2))
+
 if __name__ == '__main__':
     unittest.main()
