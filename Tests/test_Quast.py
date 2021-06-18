@@ -128,6 +128,14 @@ class TestQuast(unittest.TestCase):
         c.prune_empty_branches()
         self.assertTrue(c.reconstruct_set() == A.intersect(B))
 
+    def test_prune_empty_branches__1(self):
+        A = isl.Set("{[x,y]: x <= -2 or (x > 0) or (x + y <= 3 and x - y >= 9) or x>= 5}")
+        B = isl.Set("{[x, y]: x < 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = a.intersect(b)
+        c.prune_empty_branches()
+        self.assertTrue(c.reconstruct_set() == A.intersect(B))
 
 if __name__ == '__main__':
     unittest.main()
