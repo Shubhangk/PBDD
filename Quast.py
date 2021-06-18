@@ -57,7 +57,7 @@ class Quast:
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
         intersection_quast = Quast(space=self.get_space())
-        intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node)
+        intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node, new_node2=[None])
         return intersection_quast
 
     def reconstruct_set(self):
@@ -94,24 +94,26 @@ class Quast:
         negated_constraint = negated_constraint.set_constant_val(negated_constraint.get_constant_val() - 1)
         return negated_constraint
 
-    def __intersect(self, node1, node2):
+    def __intersect(self, node1, node2, new_node2):
         if node1 is None:
             if node2.node_type is node2.IN_NODE:
                 return self.in_node
             elif node2.node_type is node2.OUT_NODE:
                 return self.out_node
             else:
-                true_branch_node = self.__intersect(node1=node1, node2=node2.true_branch_node)
-                false_branch_node = self.__intersect(node1=node1, node2=node2.false_branch_node)
+                true_branch_node = self.__intersect(node1=node1, node2=node2.true_branch_node, new_node2=new_node2)
+                false_branch_node = self.__intersect(node1=node1, node2=node2.false_branch_node, new_node2=new_node2)
                 return Node(constraint=node2.constraint, false_branch_node=false_branch_node,
                             true_branch_node=true_branch_node)
         if node1.node_type is node1.IN_NODE:
-            return self.__intersect(node1=None, node2=node2)
+            if new_node2[0] is None:
+                new_node2[0] = self.__intersect(node1=None, node2=node2, new_node2=new_node2)
+            return new_node2[0]
         elif node1.node_type is node1.OUT_NODE:
             return self.out_node
         else:
-            true_branch_node = self.__intersect(node1=node1.true_branch_node, node2=node2)
-            false_branch_node = self.__intersect(node1=node1.false_branch_node, node2=node2)
+            true_branch_node = self.__intersect(node1=node1.true_branch_node, node2=node2, new_node2=new_node2)
+            false_branch_node = self.__intersect(node1=node1.false_branch_node, node2=node2, new_node2=new_node2)
             return Node(constraint=node1.constraint, false_branch_node=false_branch_node,
                         true_branch_node=true_branch_node)
 
