@@ -222,34 +222,34 @@ class Quast:
         elif self.__is_constraint_valid(node.constraint, constraint_list):
             root_to_node_path.append([node, False])
             self.__prune_branch(root_to_node_path, i=0)
-            root_to_node_path.pop()
+            node = root_to_node_path.pop()[0]
             root_to_node_path.append([node, True])
             constraint_list.append(node.constraint)
             self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
             constraint_list.pop()
-            root_to_node_path.pop()
+            node = root_to_node_path.pop()[0]
         elif self.__is_constraint_valid(self.__negate_constraint(node.constraint), constraint_list):
             root_to_node_path.append([node, True])
             self.__prune_branch(root_to_node_path, i=0)
-            root_to_node_path.pop()
+            node = root_to_node_path.pop()[0]
             root_to_node_path.append([node, False])
             constraint_list.append(self.__negate_constraint(node.constraint))
             self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
             constraint_list.pop()
-            root_to_node_path.pop()
+            node = root_to_node_path.pop()[0]
         else:
             constraint_list.append(node.constraint)
             root_to_node_path.append([node, True])
             self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
             constraint_list.pop()
-            root_to_node_path.pop()
+            node = root_to_node_path.pop()[0]
             constraint_list.append(self.__negate_constraint(node.constraint))
             root_to_node_path.append([node, False])
             self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
             constraint_list.pop()
-            root_to_node_path.pop()
+            node = root_to_node_path.pop()[0]
 
-    def __prune_branch(self, root_to_node_path, i):
+    def __prune_branch(self, root_to_node_path, i=0):
         node, branch = root_to_node_path[i][0], root_to_node_path[i][1]
         if i == len(root_to_node_path) - 1:
             return node.false_branch_node if branch is True else node.true_branch_node
@@ -259,7 +259,44 @@ class Quast:
             new_node = Node(constraint=node.constraint, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
             if i == 0:
                 self.root_node = new_node
+            root_to_node_path[i] = [new_node, branch]
             return new_node
+
+    def prune_same_constraint_nodes(self):
+        self.__prune_same_constraint_nodes(self.root_node, [])
+
+    def __prune_same_constraint_nodes(self, node, root_to_node_path):
+        if node.is_terminal():
+            return
+
+        for [vertex,branch] in root_to_node_path:
+            if self.__are_nodes_equal(node, vertex):
+                root_to_node_path.append([node, not branch])
+                self.__prune_branch(root_to_node_path)
+                node = root_to_node_path.pop()[0]
+                self.__prune_same_constraint_nodes(node.true_branch_node if branch else node.false_branch_node,
+                                                   root_to_node_path)
+                return
+            elif self.__are_nodes_equal(Node(constraint=self.__negate_constraint(node.constraint)), vertex):
+                root_to_node_path.append([node, branch])
+                self.__prune_branch(root_to_node_path)
+                node = root_to_node_path.pop()[0]
+                self.__prune_same_constraint_nodes(node.false_branch_node if branch else node.true_branch_node,
+                                                   root_to_node_path)
+                return
+
+        root_to_node_path.append([node, True])
+        self.__prune_same_constraint_nodes(node.true_branch_node, root_to_node_path)
+        node = root_to_node_path.pop()[0]
+        root_to_node_path.append([node, False])
+        self.__prune_same_constraint_nodes(node.false_branch_node, root_to_node_path)
+        node = root_to_node_path.pop()[0]
+
+    def __are_nodes_equal(self, node1, node2):
+        constraint1 = node1.constraint
+        constraint2 = node2.constraint
+        return constraint1.get_space() == constraint2.get_space() and (
+                constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
 
 class BasicQuast(Quast):
 
