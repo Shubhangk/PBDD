@@ -178,6 +178,14 @@ class TestQuast(unittest.TestCase):
         a2 = Q.Quast(A2)
         self.assertTrue(a1.intersect(a2).is_empty())
 
-
+    def test_prune_equal_children_node__0(self):
+        A = isl.BasicSet("{[x]: x > 0}")
+        B = isl.BasicSet("{[x]: x < 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = a.intersect(b)
+        c.prune_empty_branches()
+        c.prune_equal_children_node()
+        self.assertTrue(c.reconstruct_set().is_empty())
 if __name__ == '__main__':
     unittest.main()
