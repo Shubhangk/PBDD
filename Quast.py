@@ -233,31 +233,21 @@ class Quast:
             root_to_node_path.append([node, False])
             self.__prune_branch(root_to_node_path, i=0)
             node = root_to_node_path.pop()[0]
-            root_to_node_path.append([node, True])
-            constraint_list.append(node.constraint)
-            self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
-            constraint_list.pop()
-            node = root_to_node_path.pop()[0]
         elif self.__is_constraint_valid(self.__negate_constraint(node.constraint), constraint_list):
             root_to_node_path.append([node, True])
             self.__prune_branch(root_to_node_path, i=0)
             node = root_to_node_path.pop()[0]
-            root_to_node_path.append([node, False])
-            constraint_list.append(self.__negate_constraint(node.constraint))
-            self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
-            constraint_list.pop()
-            node = root_to_node_path.pop()[0]
-        else:
-            constraint_list.append(node.constraint)
-            root_to_node_path.append([node, True])
-            self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
-            constraint_list.pop()
-            node = root_to_node_path.pop()[0]
-            constraint_list.append(self.__negate_constraint(node.constraint))
-            root_to_node_path.append([node, False])
-            self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
-            constraint_list.pop()
-            node = root_to_node_path.pop()[0]
+        constraint_list.append(node.constraint)
+        root_to_node_path.append([node, True])
+        self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
+        constraint_list.pop()
+        node = root_to_node_path.pop()[0]
+        constraint_list.append(self.__negate_constraint(node.constraint))
+        root_to_node_path.append([node, False])
+        self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
+        constraint_list.pop()
+        node = root_to_node_path.pop()[0]
+
 
     def __prune_branch(self, root_to_node_path, i=0):
         node, branch = root_to_node_path[i][0], root_to_node_path[i][1]
