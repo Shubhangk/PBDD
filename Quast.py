@@ -324,6 +324,9 @@ class Quast:
     def lexmax(self):
         return Quast(self.reconstruct_set().lexmax())
 
+    def product(self, quast):
+        return Quast(self.reconstruct_set().product(quast.reconstruct_set()))
+
 class BasicQuast(Quast):
 
     def __init__(self, basic_set=None):
