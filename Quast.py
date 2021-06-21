@@ -82,6 +82,8 @@ class Quast:
             if arc[1] not in nodes:
                 dot.node(str(id(arc[1])), self.__get_visualization_label(arc[1].constraint))
             dot.edge(str(id(arc[0])), str(id(arc[1])), label=arc[2])
+        if arcs == set():
+            dot.node('root', self.root_node.constraint)
         print(dot.source)
         dot.render('visualization-output/quast', view=True)
 
@@ -326,6 +328,66 @@ class Quast:
 
     def product(self, quast):
         return Quast(self.reconstruct_set().product(quast.reconstruct_set()))
+
+    def update_predecessors_of_same_child_node(self, reachable_dict, target):
+        reachable_dict[target] = target.true_branch_node
+        self.__update_predecessors_of_same_child_node(reachable_dict, self.root_node)
+        reachable_dict.pop(target, None)
+        return reachable_dict
+
+    def __update_predecessors_of_same_child_node(self, reachable_dict, curr_node):
+        if curr_node not in reachable_dict:
+            return curr_node
+        else:
+            if reachable_dict[curr_node] is None:
+                new_true_branch_node = self.__update_predecessors_of_same_child_node(reachable_dict,
+                                                                                     curr_node.true_branch_node)
+                new_false_branch_node = self.__update_predecessors_of_same_child_node(reachable_dict,
+                                                                                     curr_node.false_branch_node)
+                new_curr_node = Node(curr_node.constraint, false_branch_node=new_false_branch_node,
+                                     true_branch_node=new_true_branch_node)
+                reachable_dict[curr_node] = new_curr_node
+            if curr_node is self.root_node:
+                self.root_node = reachable_dict[curr_node]
+            return reachable_dict[curr_node]
+
+    def get_reachable_subDAG_as_dict(self, target):
+        reachable_dict = {}
+        self.__get_reachable_subDAG_as_dict(target=target, curr_node=self.root_node, reachable_dict=reachable_dict)
+        return reachable_dict
+
+    def __get_reachable_subDAG_as_dict(self, target, curr_node, reachable_dict):
+        if curr_node is target:
+            return True
+        elif curr_node.is_terminal():
+            return False
+        else:
+            is_true_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.true_branch_node, reachable_dict)
+            is_false_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.false_branch_node, reachable_dict)
+            if is_true_reachable or is_false_reachable:
+                reachable_dict[curr_node] = None
+
+    def prune_equal_children_node(self):
+        return self.__prune_equal_children_node(self.root_node)
+
+    def __prune_equal_children_node(self, curr_node):
+        if curr_node.is_terminal():
+            return None
+        elif curr_node.true_branch_node is curr_node.false_branch_node:
+            reachable_dict1 = self.update_predecessors_of_same_child_node(target=curr_node, reachable_dict=self.get_reachable_subDAG_as_dict(curr_node))
+            reachable_dict2 = self.__prune_equal_children_node(curr_node.true_branch_node)
+            return reachable_dict1 if reachable_dict2 is None else reachable_dict2
+        else:
+            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.true_branch_node)
+            if reachable_dict is not None:
+                curr_node = reachable_dict[curr_node]
+            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.false_branch_node)
+            if reachable_dict is not None:
+                curr_node = reachable_dict[curr_node]
+            if curr_node.true_branch_node is curr_node.false_branch_node:
+                reachable_dict = self.prune_equal_children_node(curr_node)
+            return reachable_dict
+
 
 class BasicQuast(Quast):
 
