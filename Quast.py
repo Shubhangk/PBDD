@@ -312,21 +312,17 @@ class Quast:
     def is_equal(self, quast):
         return self.reconstruct_set() == quast.reconstruct_set()
 
-    def apply(self):
-        # Todo -- Need to complete.
-        return None
+    def apply(self, basic_map):
+        return Quast(self.reconstruct_set().apply(basic_map))
 
-    def project_out(self):
-        # Todo -- Need to complete.
-        return None
+    def project_out(self, dim_type, first, n):
+        return Quast(self.reconstruct_set().project_out(dim_type, first, n))
 
     def lexmin(self):
-        # Todo -- Need to complete.
-        return None
+        return Quast(self.reconstruct_set().lexmin())
 
     def lexmax(self):
-        # Todo -- Need to complete.
-        return None
+        return Quast(self.reconstruct_set().lexmax())
 
 class BasicQuast(Quast):
 
