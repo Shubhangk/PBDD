@@ -242,7 +242,7 @@ class Quast:
             root_to_node_path.append([node, True])
             self.__prune_branch(root_to_node_path, i=0)
             node = root_to_node_path.pop()[0]
-            return False
+            return True
         constraint_list.append(node.constraint)
         root_to_node_path.append([node, True])
         modified = self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
@@ -387,6 +387,10 @@ class Quast:
                 reachable_dict = self.prune_equal_children_node(curr_node)
             return reachable_dict
 
+    def simplify(self):
+        self.prune_same_constraint_nodes()
+        self.prune_empty_branches()
+        self.prune_equal_children_node()
 
 class BasicQuast(Quast):
 
