@@ -187,5 +187,23 @@ class TestQuast(unittest.TestCase):
         c.prune_empty_branches()
         c.prune_equal_children_node()
         self.assertTrue(c.reconstruct_set().is_empty())
+
+    def test_prune_empty_branches_AND_equal_children_node(self):
+        A = isl.BasicSet("{[x, y]: y <= 0 and x >=0}")
+        B = isl.BasicSet("{[x,y]:x < 0}")
+        C = isl.BasicSet("{[x,y]:y > 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = Q.Quast(C)
+        d = a.intersect(b)
+        e = d.union(c)
+        e.prune_empty_branches()
+        e.prune_equal_children_node()
+        self.assertTrue(e.reconstruct_set() == A.intersect(B).union(C))
+        space = A.get_space()
+        self.assertTrue(self.are_constraints_equal(e.root_node.constraint, isl.Constraint.ineq_from_names(space, {1: 0, "y": -1})))
+        self.assertTrue(e.root_node.true_branch_node.node_type == e.root_node.true_branch_node.OUT_NODE)
+        self.assertTrue(e.root_node.false_branch_node.node_type == e.root_node.true_branch_node.IN_NODE)
+
 if __name__ == '__main__':
     unittest.main()
