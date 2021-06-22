@@ -224,29 +224,38 @@ class Quast:
         return bset.is_subset(halfspace)
 
     def prune_empty_branches(self):
-        self.__prune_empty_branches(self.root_node, [], [])
+        MAX_MODIFICATIONS = 1000
+        num_modifications = 0
+        modified = True
+        while modified and num_modifications < MAX_MODIFICATIONS:
+            modified = self.__prune_empty_branches(self.root_node, [], [])
 
     def __prune_empty_branches(self, node, root_to_node_path, constraint_list):
         if node.is_terminal():
-            return
+            return False
         elif self.__is_constraint_valid(node.constraint, constraint_list):
             root_to_node_path.append([node, False])
             self.__prune_branch(root_to_node_path, i=0)
             node = root_to_node_path.pop()[0]
+            return True
         elif self.__is_constraint_valid(self.__negate_constraint(node.constraint), constraint_list):
             root_to_node_path.append([node, True])
             self.__prune_branch(root_to_node_path, i=0)
             node = root_to_node_path.pop()[0]
+            return False
         constraint_list.append(node.constraint)
         root_to_node_path.append([node, True])
-        self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
+        modified = self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
+        if modified:
+            return True
         constraint_list.pop()
         node = root_to_node_path.pop()[0]
         constraint_list.append(self.__negate_constraint(node.constraint))
         root_to_node_path.append([node, False])
-        self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
+        modified = self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
         constraint_list.pop()
         node = root_to_node_path.pop()[0]
+        return modified
 
 
     def __prune_branch(self, root_to_node_path, i=0):
