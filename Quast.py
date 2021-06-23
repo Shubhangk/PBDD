@@ -224,14 +224,14 @@ class Quast:
         halfspace = isl.BasicSet.from_constraint(constraint)
         return bset.is_subset(halfspace)
 
-    def prune_empty_branches(self):
+    def prune_emptyset_branches(self):
         MAX_MODIFICATIONS = 1000
         num_modifications = 0
         modified = True
         while modified and num_modifications < MAX_MODIFICATIONS:
-            modified = self.__prune_empty_branches(self.root_node, [], [])
+            modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
 
-    def __prune_empty_branches(self, node, root_to_node_path, constraint_list):
+    def __detect_and_prune_emptyset_branch(self, node, root_to_node_path, constraint_list):
         if node.is_terminal():
             return False
         elif self.__is_constraint_valid(node.constraint, constraint_list):
@@ -246,14 +246,14 @@ class Quast:
             return True
         constraint_list.append(node.constraint)
         root_to_node_path.append([node, True])
-        modified = self.__prune_empty_branches(node.true_branch_node, root_to_node_path, constraint_list)
+        modified = self.__detect_and_prune_emptyset_branch(node.true_branch_node, root_to_node_path, constraint_list)
         if modified:
             return True
         constraint_list.pop()
         node = root_to_node_path.pop()[0]
         constraint_list.append(self.__negate_constraint(node.constraint))
         root_to_node_path.append([node, False])
-        modified = self.__prune_empty_branches(node.false_branch_node, root_to_node_path, constraint_list)
+        modified = self.__detect_and_prune_emptyset_branch(node.false_branch_node, root_to_node_path, constraint_list)
         constraint_list.pop()
         node = root_to_node_path.pop()[0]
         return modified
@@ -274,34 +274,32 @@ class Quast:
             root_to_node_path[i] = [new_node, branch]
             return new_node
 
-    def prune_same_constraint_nodes(self):
-        self.__prune_same_constraint_nodes(self.root_node, [])
+    def prune_redundant_branches(self):
+        self.__prune_redundant_branches(self.root_node, [])
 
-    def __prune_same_constraint_nodes(self, node, root_to_node_path):
+    def __prune_redundant_branches(self, node, root_to_node_path):
         if node.is_terminal():
             return
-
         for [vertex, branch] in root_to_node_path:
             if self.__are_nodes_equal(node, vertex):
                 root_to_node_path.append([node, not branch])
                 self.__prune_branch(root_to_node_path)
                 node = root_to_node_path.pop()[0]
-                self.__prune_same_constraint_nodes(node.true_branch_node if branch else node.false_branch_node,
-                                                   root_to_node_path)
+                self.__prune_redundant_branches(node.true_branch_node if branch else node.false_branch_node,
+                                                root_to_node_path)
                 return
             elif self.__are_nodes_equal(Node(constraint=self.__negate_constraint(node.constraint)), vertex):
                 root_to_node_path.append([node, branch])
                 self.__prune_branch(root_to_node_path)
                 node = root_to_node_path.pop()[0]
-                self.__prune_same_constraint_nodes(node.false_branch_node if branch else node.true_branch_node,
-                                                   root_to_node_path)
+                self.__prune_redundant_branches(node.false_branch_node if branch else node.true_branch_node,
+                                                root_to_node_path)
                 return
-
         root_to_node_path.append([node, True])
-        self.__prune_same_constraint_nodes(node.true_branch_node, root_to_node_path)
+        self.__prune_redundant_branches(node.true_branch_node, root_to_node_path)
         node = root_to_node_path.pop()[0]
         root_to_node_path.append([node, False])
-        self.__prune_same_constraint_nodes(node.false_branch_node, root_to_node_path)
+        self.__prune_redundant_branches(node.false_branch_node, root_to_node_path)
         node = root_to_node_path.pop()[0]
 
     def __are_nodes_equal(self, node1, node2):
@@ -333,25 +331,25 @@ class Quast:
 
     def update_predecessors_of_same_child_node(self, reachable_dict, target):
         reachable_dict[target] = target.true_branch_node
-        self.__update_predecessors_of_same_child_node(reachable_dict, self.root_node)
+        self.__update_subDAG(reachable_dict, self.root_node)
         reachable_dict.pop(target, None)
         return reachable_dict
 
-    def __update_predecessors_of_same_child_node(self, reachable_dict, curr_node):
-        if curr_node not in reachable_dict:
+    def __update_subDAG(self, old_to_new_nodes_dict, curr_node):
+        if curr_node not in old_to_new_nodes_dict:
             return curr_node
         else:
-            if reachable_dict[curr_node] is None:
-                new_true_branch_node = self.__update_predecessors_of_same_child_node(reachable_dict,
-                                                                                     curr_node.true_branch_node)
-                new_false_branch_node = self.__update_predecessors_of_same_child_node(reachable_dict,
-                                                                                      curr_node.false_branch_node)
+            if old_to_new_nodes_dict[curr_node] is None:
+                new_true_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
+                                                            curr_node.true_branch_node)
+                new_false_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
+                                                             curr_node.false_branch_node)
                 new_curr_node = Node(curr_node.constraint, false_branch_node=new_false_branch_node,
                                      true_branch_node=new_true_branch_node)
-                reachable_dict[curr_node] = new_curr_node
+                old_to_new_nodes_dict[curr_node] = new_curr_node
             if curr_node is self.root_node:
-                self.root_node = reachable_dict[curr_node]
-            return reachable_dict[curr_node]
+                self.root_node = old_to_new_nodes_dict[curr_node]
+            return old_to_new_nodes_dict[curr_node]
 
     def get_reachable_subDAG_as_dict(self, target):
         reachable_dict = {}
@@ -394,8 +392,8 @@ class Quast:
             return reachable_dict
 
     def simplify(self):
-        self.prune_same_constraint_nodes()
-        self.prune_empty_branches()
+        self.prune_redundant_branches()
+        self.prune_emptyset_branches()
         self.prune_equal_children_node()
 
     # Description: returns a set of all nodes in the current quast
@@ -420,10 +418,10 @@ class Quast:
                     if node2 in can_reach_node1:
                         can_reach_node2 = self.get_reachable_subDAG_as_dict(node2)
                         can_reach_node2[node2] = node1
-                        self.__update_predecessors_of_same_child_node(can_reach_node2, self.root_node)
+                        self.__update_subDAG(can_reach_node2, self.root_node)
                     else:
                         can_reach_node1[node1] = node2
-                        self.__update_predecessors_of_same_child_node(can_reach_node1, self.root_node)
+                        self.__update_subDAG(can_reach_node1, self.root_node)
 
     def __are_subtrees_isomorphic(self, root1, root2):
         if root1.is_terminal() or root2.is_terminal():
