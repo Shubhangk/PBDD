@@ -411,9 +411,10 @@ class Quast:
 
     def prune_isomorphic_subtrees(self):
         node_set = self.__get_node_set()
+        memo_table = {}
         for node1 in node_set:
             for node2 in node_set:
-                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2):
+                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2, memo_table):
                     can_reach_node1 = self.get_reachable_subDAG_as_dict(node1)
                     if node2 in can_reach_node1:
                         can_reach_node2 = self.get_reachable_subDAG_as_dict(node2)
@@ -423,11 +424,18 @@ class Quast:
                         can_reach_node1[node1] = node2
                         self.__update_subDAG(can_reach_node1, self.root_node)
 
-    def __are_subtrees_isomorphic(self, root1, root2):
-        if root1.is_terminal() or root2.is_terminal():
+    def __are_subtrees_isomorphic(self, root1, root2, memo_table):
+        if (root1, root2) in memo_table:
+            return memo_table[(root1, root2)]
+        elif (root2, root1) in memo_table:
+            return memo_table[(root2, root1)]
+        elif root1.is_terminal() or root2.is_terminal():
             return root1 is root2
         else:
-            return self.__are_nodes_equal(root1, root2) and self.__are_subtrees_isomorphic(root1.true_branch_node, root2.true_branch_node) and self.__are_subtrees_isomorphic(root1.false_branch_node, root2.false_branch_node)
+            are_isomorphic = self.__are_nodes_equal(root1, root2) and self.__are_subtrees_isomorphic(root1.true_branch_node, root2.true_branch_node, memo_table) and self.__are_subtrees_isomorphic(root1.false_branch_node, root2.false_branch_node, memo_table)
+            memo_table[(root1, root2)] = are_isomorphic
+            memo_table[(root2, root1)] = are_isomorphic
+            return are_isomorphic
 
 class BasicQuast(Quast):
 
