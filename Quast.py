@@ -31,11 +31,18 @@ class Quast:
             self.set_space(space)
             self.root_node = None
 
+    ################################
+    # Getters and Setters
+    ################################
     def get_space(self):
         return self.space
 
     def set_space(self, new_space):
         self.space = new_space
+
+    ####################################
+    # Quast API for set operations
+    ####################################
 
     def union(self, quast):
         if self.get_space() != quast.get_space():
@@ -68,7 +75,6 @@ class Quast:
             final_set = final_set.union(basic_set)
         return final_set
 
-    # Description: proxy function for recursively printing QUAST level-by-level
     def print_tree(self):
         self.__print_tree(node=self.root_node, level=0)
 
@@ -87,6 +93,69 @@ class Quast:
             dot.node('root', self.root_node.constraint)
         print(dot.source)
         dot.render('visualization-output/quast', view=True)
+
+    def is_empty(self):
+        return self.reconstruct_set().is_empty()
+
+    def is_equal(self, quast):
+        return self.reconstruct_set() == quast.reconstruct_set()
+
+    def apply(self, basic_map):
+        return Quast(self.reconstruct_set().apply(basic_map))
+
+    def project_out(self, dim_type, first, n):
+        return Quast(self.reconstruct_set().project_out(dim_type, first, n))
+
+    def lexmin(self):
+        return Quast(self.reconstruct_set().lexmin())
+
+    def lexmax(self):
+        return Quast(self.reconstruct_set().lexmax())
+
+    def product(self, quast):
+        return Quast(self.reconstruct_set().product(quast.reconstruct_set()))
+
+    ######################################################################
+    # Quast API for optimizing tree representation of underlying sets
+    ######################################################################
+
+    def prune_redundant_branches(self):
+        self.__prune_redundant_branches(self.root_node, [])
+
+    def prune_emptyset_branches(self):
+        MAX_MODIFICATIONS = 1000
+        num_modifications = 0
+        modified = True
+        while modified and num_modifications < MAX_MODIFICATIONS:
+            modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
+
+    def prune_equal_children_node(self):
+        return self.__prune_equal_children_node(self.root_node)
+
+    def prune_isomorphic_subtrees(self):
+        node_set = self.__get_node_set()
+        memo_table = {}
+        for node1 in node_set:
+            for node2 in node_set:
+                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2, memo_table):
+                    can_reach_node1 = self.__get_reachable_subDAG_as_dict(node1)
+                    if node2 in can_reach_node1:
+                        can_reach_node2 = self.__get_reachable_subDAG_as_dict(node2)
+                        can_reach_node2[node2] = node1
+                        self.__update_subDAG(can_reach_node2, self.root_node)
+                    else:
+                        can_reach_node1[node1] = node2
+                        self.__update_subDAG(can_reach_node1, self.root_node)
+
+    def simplify(self):
+        self.prune_redundant_branches()
+        self.prune_emptyset_branches()
+        self.prune_isomorphic_subtrees()
+        self.prune_equal_children_node()
+
+    ########################################################################
+    # Internal implementation of set operations in quast representation
+    ########################################################################
 
     def __negate_constraint(self, constraint):
         coefficients = constraint.get_coefficients_by_name()
@@ -197,39 +266,9 @@ class Quast:
     def __get_visualization_label(self, constraint):
         return str(constraint).split(":")[-1].split("}")[0]
 
-    def __get_parent_list(self, target, current=None):
-        if current is None:
-            current = self.root_node  # should only execute during the top level recursive call
-        elif current is target:
-            return []  # target can never be its own parent in future recursive calls as the Quast is a DAG
-
-        is_current_parent = []
-        if current.true_branch_node is target or current.false_branch_node is target:
-            is_current_parent = [current]
-
-        if current.true_branch_node is not None:
-            parents_from_true_branch = self.__get_parent_list(target, current.true_branch_node)
-        else:
-            parents_from_true_branch = []
-
-        if current.false_branch_node is not None:
-            parents_from_false_branch = self.__get_parent_list(target, current.false_branch_node)
-        else:
-            parents_from_false_branch = []
-
-        return parents_from_true_branch + parents_from_false_branch + is_current_parent
-
-    def __is_constraint_valid(self, constraint, constraint_list):
-        bset = isl.BasicSet.universe(self.get_space()).add_constraints(constraint_list)
-        halfspace = isl.BasicSet.from_constraint(constraint)
-        return bset.is_subset(halfspace)
-
-    def prune_emptyset_branches(self):
-        MAX_MODIFICATIONS = 1000
-        num_modifications = 0
-        modified = True
-        while modified and num_modifications < MAX_MODIFICATIONS:
-            modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
+    ########################################################################
+    # Internal implementation of quast optimization functions
+    ########################################################################
 
     def __detect_and_prune_emptyset_branch(self, node, root_to_node_path, constraint_list):
         if node.is_terminal():
@@ -274,9 +313,6 @@ class Quast:
             root_to_node_path[i] = [new_node, branch]
             return new_node
 
-    def prune_redundant_branches(self):
-        self.__prune_redundant_branches(self.root_node, [])
-
     def __prune_redundant_branches(self, node, root_to_node_path):
         if node.is_terminal():
             return
@@ -302,34 +338,41 @@ class Quast:
         self.__prune_redundant_branches(node.false_branch_node, root_to_node_path)
         node = root_to_node_path.pop()[0]
 
-    def __are_nodes_equal(self, node1, node2):
-        constraint1 = node1.constraint
-        constraint2 = node2.constraint
-        return constraint1.get_space() == constraint2.get_space() and (
-                constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
+    def __prune_equal_children_node(self, curr_node):
+        if curr_node.is_terminal():
+            return None
+        elif curr_node.true_branch_node is curr_node.false_branch_node:
+            reachable_dict1 = self.__update_predecessors_of_same_child_node(target=curr_node,
+                                                                            reachable_dict=self.__get_reachable_subDAG_as_dict(curr_node))
+            reachable_dict2 = self.__prune_equal_children_node(curr_node.true_branch_node)
+            return reachable_dict1 if reachable_dict2 is None else reachable_dict2
+        else:
+            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.true_branch_node)
+            if reachable_dict is not None:
+                curr_node = reachable_dict[curr_node]
+            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.false_branch_node)
+            if reachable_dict is not None:
+                curr_node = reachable_dict[curr_node]
+            if curr_node.true_branch_node is curr_node.false_branch_node:
+                reachable_dict = self.prune_equal_children_node(curr_node)
+            return reachable_dict
 
-    def is_empty(self):
-        return self.reconstruct_set().is_empty()
+    def __are_subtrees_isomorphic(self, root1, root2, memo_table):
+        if (root1, root2) in memo_table:
+            return memo_table[(root1, root2)]
+        elif (root2, root1) in memo_table:
+            return memo_table[(root2, root1)]
+        elif root1.is_terminal() or root2.is_terminal():
+            return root1 is root2
+        else:
+            are_isomorphic = self.__are_nodes_equal(root1, root2) and self.__are_subtrees_isomorphic(
+                root1.true_branch_node, root2.true_branch_node, memo_table) and self.__are_subtrees_isomorphic(
+                root1.false_branch_node, root2.false_branch_node, memo_table)
+            memo_table[(root1, root2)] = are_isomorphic
+            memo_table[(root2, root1)] = are_isomorphic
+            return are_isomorphic
 
-    def is_equal(self, quast):
-        return self.reconstruct_set() == quast.reconstruct_set()
-
-    def apply(self, basic_map):
-        return Quast(self.reconstruct_set().apply(basic_map))
-
-    def project_out(self, dim_type, first, n):
-        return Quast(self.reconstruct_set().project_out(dim_type, first, n))
-
-    def lexmin(self):
-        return Quast(self.reconstruct_set().lexmin())
-
-    def lexmax(self):
-        return Quast(self.reconstruct_set().lexmax())
-
-    def product(self, quast):
-        return Quast(self.reconstruct_set().product(quast.reconstruct_set()))
-
-    def update_predecessors_of_same_child_node(self, reachable_dict, target):
+    def __update_predecessors_of_same_child_node(self, reachable_dict, target):
         reachable_dict[target] = target.true_branch_node
         self.__update_subDAG(reachable_dict, self.root_node)
         reachable_dict.pop(target, None)
@@ -351,50 +394,59 @@ class Quast:
                 self.root_node = old_to_new_nodes_dict[curr_node]
             return old_to_new_nodes_dict[curr_node]
 
-    def get_reachable_subDAG_as_dict(self, target):
+    def __get_reachable_subDAG_as_dict(self, target):
         reachable_dict = {}
-        self.__get_reachable_subDAG_as_dict(target=target, curr_node=self.root_node, reachable_dict=reachable_dict)
+        self.__add_reachable_subDAG_into_dict(target=target, curr_node=self.root_node, reachable_dict=reachable_dict)
         return reachable_dict
 
-    def __get_reachable_subDAG_as_dict(self, target, curr_node, reachable_dict):
+    ####################################################################
+    # Internal helper functions
+    ####################################################################
+
+    def __get_parent_list(self, target, current=None):
+        if current is None:
+            current = self.root_node  # should only execute during the top level recursive call
+        elif current is target:
+            return []  # target can never be its own parent in future recursive calls as the Quast is a DAG
+
+        is_current_parent = []
+        if current.true_branch_node is target or current.false_branch_node is target:
+            is_current_parent = [current]
+
+        if current.true_branch_node is not None:
+            parents_from_true_branch = self.__get_parent_list(target, current.true_branch_node)
+        else:
+            parents_from_true_branch = []
+
+        if current.false_branch_node is not None:
+            parents_from_false_branch = self.__get_parent_list(target, current.false_branch_node)
+        else:
+            parents_from_false_branch = []
+
+        return parents_from_true_branch + parents_from_false_branch + is_current_parent
+
+    def __is_constraint_valid(self, constraint, constraint_list):
+        bset = isl.BasicSet.universe(self.get_space()).add_constraints(constraint_list)
+        halfspace = isl.BasicSet.from_constraint(constraint)
+        return bset.is_subset(halfspace)
+
+    def __are_nodes_equal(self, node1, node2):
+        constraint1 = node1.constraint
+        constraint2 = node2.constraint
+        return constraint1.get_space() == constraint2.get_space() and (
+                constraint1.get_coefficients_by_name() == constraint2.get_coefficients_by_name())
+
+    def __add_reachable_subDAG_into_dict(self, target, curr_node, reachable_dict):
         if curr_node is target:
             return True
         elif curr_node.is_terminal():
             return False
         else:
-            is_true_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.true_branch_node, reachable_dict)
-            is_false_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.false_branch_node,
-                                                                     reachable_dict)
+            is_true_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.true_branch_node, reachable_dict)
+            is_false_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.false_branch_node,
+                                                                       reachable_dict)
             if is_true_reachable or is_false_reachable:
                 reachable_dict[curr_node] = None
-
-    def prune_equal_children_node(self):
-        return self.__prune_equal_children_node(self.root_node)
-
-    def __prune_equal_children_node(self, curr_node):
-        if curr_node.is_terminal():
-            return None
-        elif curr_node.true_branch_node is curr_node.false_branch_node:
-            reachable_dict1 = self.update_predecessors_of_same_child_node(target=curr_node,
-                                                                          reachable_dict=self.get_reachable_subDAG_as_dict(
-                                                                              curr_node))
-            reachable_dict2 = self.__prune_equal_children_node(curr_node.true_branch_node)
-            return reachable_dict1 if reachable_dict2 is None else reachable_dict2
-        else:
-            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.true_branch_node)
-            if reachable_dict is not None:
-                curr_node = reachable_dict[curr_node]
-            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.false_branch_node)
-            if reachable_dict is not None:
-                curr_node = reachable_dict[curr_node]
-            if curr_node.true_branch_node is curr_node.false_branch_node:
-                reachable_dict = self.prune_equal_children_node(curr_node)
-            return reachable_dict
-
-    def simplify(self):
-        self.prune_redundant_branches()
-        self.prune_emptyset_branches()
-        self.prune_equal_children_node()
 
     # Description: returns a set of all nodes in the current quast
     # Return: Python.set of Nodes
@@ -409,33 +461,6 @@ class Quast:
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
         return node_set
 
-    def prune_isomorphic_subtrees(self):
-        node_set = self.__get_node_set()
-        memo_table = {}
-        for node1 in node_set:
-            for node2 in node_set:
-                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2, memo_table):
-                    can_reach_node1 = self.get_reachable_subDAG_as_dict(node1)
-                    if node2 in can_reach_node1:
-                        can_reach_node2 = self.get_reachable_subDAG_as_dict(node2)
-                        can_reach_node2[node2] = node1
-                        self.__update_subDAG(can_reach_node2, self.root_node)
-                    else:
-                        can_reach_node1[node1] = node2
-                        self.__update_subDAG(can_reach_node1, self.root_node)
-
-    def __are_subtrees_isomorphic(self, root1, root2, memo_table):
-        if (root1, root2) in memo_table:
-            return memo_table[(root1, root2)]
-        elif (root2, root1) in memo_table:
-            return memo_table[(root2, root1)]
-        elif root1.is_terminal() or root2.is_terminal():
-            return root1 is root2
-        else:
-            are_isomorphic = self.__are_nodes_equal(root1, root2) and self.__are_subtrees_isomorphic(root1.true_branch_node, root2.true_branch_node, memo_table) and self.__are_subtrees_isomorphic(root1.false_branch_node, root2.false_branch_node, memo_table)
-            memo_table[(root1, root2)] = are_isomorphic
-            memo_table[(root2, root1)] = are_isomorphic
-            return are_isomorphic
 
 class BasicQuast(Quast):
 
