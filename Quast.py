@@ -57,7 +57,8 @@ class Quast:
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
         intersection_quast = Quast(space=self.get_space())
-        intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node, new_node2=[None])
+        intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node,
+                                                                      new_node2=[None])
         return intersection_quast
 
     def reconstruct_set(self):
@@ -257,15 +258,17 @@ class Quast:
         node = root_to_node_path.pop()[0]
         return modified
 
-
     def __prune_branch(self, root_to_node_path, i=0):
         node, branch = root_to_node_path[i][0], root_to_node_path[i][1]
         if i == len(root_to_node_path) - 1:
             return node.false_branch_node if branch is True else node.true_branch_node
         else:
-            new_true_branch_node = self.__prune_branch(root_to_node_path, i+1) if branch is True else node.true_branch_node
-            new_false_branch_node = self.__prune_branch(root_to_node_path, i+1) if branch is False else node.false_branch_node
-            new_node = Node(constraint=node.constraint, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
+            new_true_branch_node = self.__prune_branch(root_to_node_path,
+                                                       i + 1) if branch is True else node.true_branch_node
+            new_false_branch_node = self.__prune_branch(root_to_node_path,
+                                                        i + 1) if branch is False else node.false_branch_node
+            new_node = Node(constraint=node.constraint, false_branch_node=new_false_branch_node,
+                            true_branch_node=new_true_branch_node)
             if i == 0:
                 self.root_node = new_node
             root_to_node_path[i] = [new_node, branch]
@@ -278,7 +281,7 @@ class Quast:
         if node.is_terminal():
             return
 
-        for [vertex,branch] in root_to_node_path:
+        for [vertex, branch] in root_to_node_path:
             if self.__are_nodes_equal(node, vertex):
                 root_to_node_path.append([node, not branch])
                 self.__prune_branch(root_to_node_path)
@@ -342,7 +345,7 @@ class Quast:
                 new_true_branch_node = self.__update_predecessors_of_same_child_node(reachable_dict,
                                                                                      curr_node.true_branch_node)
                 new_false_branch_node = self.__update_predecessors_of_same_child_node(reachable_dict,
-                                                                                     curr_node.false_branch_node)
+                                                                                      curr_node.false_branch_node)
                 new_curr_node = Node(curr_node.constraint, false_branch_node=new_false_branch_node,
                                      true_branch_node=new_true_branch_node)
                 reachable_dict[curr_node] = new_curr_node
@@ -362,7 +365,8 @@ class Quast:
             return False
         else:
             is_true_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.true_branch_node, reachable_dict)
-            is_false_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.false_branch_node, reachable_dict)
+            is_false_reachable = self.__get_reachable_subDAG_as_dict(target, curr_node.false_branch_node,
+                                                                     reachable_dict)
             if is_true_reachable or is_false_reachable:
                 reachable_dict[curr_node] = None
 
@@ -373,7 +377,9 @@ class Quast:
         if curr_node.is_terminal():
             return None
         elif curr_node.true_branch_node is curr_node.false_branch_node:
-            reachable_dict1 = self.update_predecessors_of_same_child_node(target=curr_node, reachable_dict=self.get_reachable_subDAG_as_dict(curr_node))
+            reachable_dict1 = self.update_predecessors_of_same_child_node(target=curr_node,
+                                                                          reachable_dict=self.get_reachable_subDAG_as_dict(
+                                                                              curr_node))
             reachable_dict2 = self.__prune_equal_children_node(curr_node.true_branch_node)
             return reachable_dict1 if reachable_dict2 is None else reachable_dict2
         else:
@@ -391,6 +397,39 @@ class Quast:
         self.prune_same_constraint_nodes()
         self.prune_empty_branches()
         self.prune_equal_children_node()
+
+    # Description: returns a set of all nodes in the current quast
+    # Return: Python.set of Nodes
+    def __get_node_set(self, node_set=None, curr_node=None):
+        if node_set is None:
+            node_set = set()
+            curr_node = self.root_node
+        if curr_node.is_terminal():
+            return node_set
+        node_set.add(curr_node)
+        node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.true_branch_node)
+        node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
+        return node_set
+
+    def prune_isomorphic_subtrees(self):
+        node_set = self.__get_node_set()
+        for node1 in node_set:
+            for node2 in node_set:
+                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2):
+                    can_reach_node1 = self.get_reachable_subDAG_as_dict(node1)
+                    if node2 in can_reach_node1:
+                        can_reach_node2 = self.get_reachable_subDAG_as_dict(node2)
+                        can_reach_node2[node2] = node1
+                        self.__update_predecessors_of_same_child_node(can_reach_node2, self.root_node)
+                    else:
+                        can_reach_node1[node1] = node2
+                        self.__update_predecessors_of_same_child_node(can_reach_node1, self.root_node)
+
+    def __are_subtrees_isomorphic(self, root1, root2):
+        if root1.is_terminal() or root2.is_terminal():
+            return root1 is root2
+        else:
+            return self.__are_nodes_equal(root1, root2) and self.__are_subtrees_isomorphic(root1.true_branch_node, root2.true_branch_node) and self.__are_subtrees_isomorphic(root1.false_branch_node, root2.false_branch_node)
 
 class BasicQuast(Quast):
 
