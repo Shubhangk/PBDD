@@ -205,5 +205,26 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(e.root_node.true_branch_node.node_type == e.root_node.true_branch_node.OUT_NODE)
         self.assertTrue(e.root_node.false_branch_node.node_type == e.root_node.true_branch_node.IN_NODE)
 
+    def test_prune_isomorphic_subtrees__0(self):
+        A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
+        B = isl.BasicSet("{[x,y]:x >= 0}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = a.union(b)
+        c.prune_emptyset_branches()
+        c.prune_isomorphic_subtrees()
+        self.assertTrue(c.reconstruct_set() == A.union(B))
+        space = A.get_space()
+        self.assertTrue(self.are_constraints_equal(c.root_node.constraint, isl.Constraint.ineq_from_names(space, {"y": 1})))
+        self.assertTrue(c.root_node.true_branch_node is c.root_node.false_branch_node)
+        self.assertTrue(self.are_constraints_equal(c.root_node.true_branch_node.constraint, isl.Constraint.ineq_from_names(space, {"x": 1})))
+        self.assertTrue(c.root_node.true_branch_node.true_branch_node.node_type == c.root_node.IN_NODE)
+        self.assertTrue(c.root_node.false_branch_node.false_branch_node.node_type == c.root_node.OUT_NODE)
+        c.prune_equal_children_node()
+        self.assertTrue(self.are_constraints_equal(c.root_node.constraint,
+                                                   isl.Constraint.ineq_from_names(space, {"x": 1})))
+        self.assertTrue(c.root_node.true_branch_node.node_type == c.root_node.IN_NODE)
+        self.assertTrue(c.root_node.false_branch_node.node_type == c.root_node.OUT_NODE)
+
 if __name__ == '__main__':
     unittest.main()
