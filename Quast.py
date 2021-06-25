@@ -115,6 +115,16 @@ class Quast:
     def product(self, quast):
         return Quast(self.reconstruct_set().product(quast.reconstruct_set()))
 
+    def flat_product(self, quast):
+        # Todo -- complete function
+        pass
+
+    def extend_space(self, new_space, old_to_new_ids_map=None):
+        extended_space_quast = Quast(new_space)
+        extended_space_quast.root_node = self.__extend_space(self.root_node, extended_space_quast, new_space, old_to_new_ids_map)
+        return extended_space_quast
+
+
     ######################################################################
     # Quast API for optimizing tree representation of underlying sets
     ######################################################################
@@ -265,6 +275,41 @@ class Quast:
 
     def __get_visualization_label(self, constraint):
         return str(constraint).split(":")[-1].split("}")[0]
+
+    def __extend_space(self, curr_node, extended_space_quast, new_space, old_to_new_ids_map):
+        # Todo -- complete
+        if curr_node is self.in_node:
+            return extended_space_quast.in_node
+        elif curr_node is self.out_node:
+            return extended_space_quast.out_node
+        else:
+            old_constraint = curr_node.constraint
+            old_id_dict = old_constraint.get_id_dict()
+
+            new_name_to_coeff_map = {}
+            for old_id in old_id_dict:
+                # get the coefficient from old constraint
+                (old_type, old_pos) = old_id_dict[old_id]
+                coeff = old_constraint.get_coefficient_val(type=old_type, pos=old_pos)
+
+                # get the name of new dimension corresponding to old dimension
+                new_id = old_to_new_ids_map[old_id]
+                new_dim_name = new_id.get_name()
+
+                # add {name -> coefficient} to the coefficient dictionary
+                new_name_to_coeff_map[new_dim_name] = coeff
+
+            # set constant of new constraint as that of old constraint
+            constant = old_constraint.get_constant_val()
+            new_name_to_coeff_map[1] = constant
+
+            # create new constraint and return new node
+            new_constraint = isl.Constraint.ineq_from_names(new_space, new_name_to_coeff_map)
+            new_true_branch_node = self.__extend_space(curr_node.true_branch_node, extended_space_quast, new_space,
+                                                       old_to_new_ids_map)
+            new_false_branch_node = self.__extend_space(curr_node.false_branch_node, extended_space_quast, new_space,
+                                                       old_to_new_ids_map)
+            return Node(constraint=new_constraint, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node)
 
     ########################################################################
     # Internal implementation of quast optimization functions
@@ -460,7 +505,6 @@ class Quast:
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.true_branch_node)
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
         return node_set
-
 
 class BasicQuast(Quast):
 
