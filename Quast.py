@@ -119,11 +119,43 @@ class Quast:
         # Todo -- complete function
         pass
 
-    def extend_space(self, new_space, old_to_new_ids_map=None):
-        extended_space_quast = Quast(new_space)
-        extended_space_quast.root_node = self.__extend_space(self.root_node, extended_space_quast, new_space, old_to_new_ids_map)
+    def extend_space(self, extension_space):
+        extended_space = self.__get_extended_space(extension_space)
+        extended_space_quast = Quast(space=extended_space)
+        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
+    def __project_quast_into_extended_space(self, curr_node, extended_space, extended_space_quast):
+        if curr_node.node_type is Node.IN_NODE:
+            return extended_space_quast.in_node
+        elif curr_node.node_type is Node.OUT_NODE:
+            return extended_space_quast.out_node
+        else:
+            extended_true_branch = self.__project_quast_into_extended_space(curr_node.true_branch_node, extended_space,
+                                                                            extended_space_quast)
+            extended_false_branch = self.__project_quast_into_extended_space(curr_node.false_branch_node, extended_space,
+                                                                            extended_space_quast)
+            extended_node = Node(constraint=self.__project_constraint_into_extended_space(curr_node.constraint, extended_space),
+                            true_branch_node=extended_true_branch, false_branch_node=extended_false_branch)
+            if curr_node is self.root_node:
+                extended_space_quast.root_node = extended_node
+            return extended_node
+
+    def __get_extended_space(self, extension_space):
+        num_new_dims = self.get_space().dim(isl.dim_type.out) + extension_space.dim(isl.dim_type.out)
+        new_space = self.get_space().extend(0, 0, num_new_dims)
+        for i in range(num_new_dims):
+            new_space = new_space.set_dim_id(isl.dim_type.out, i, isl.Id("x" + str(i)))
+        return new_space
+
+    def __project_constraint_into_extended_space(self, constraint, extended_space):
+        new_constraint = isl.Constraint.ineq_from_names(extended_space, {})
+        coefficients = []
+        for i in range(constraint.get_space().dim(isl.dim_type.out)):
+            coefficients.append(constraint.get_coefficient_val(pos=i, type=isl.dim_type.out))
+        new_constraint = new_constraint.set_coefficients(dim_tp=isl.dim_type.out, args=coefficients)
+        new_constraint = new_constraint.set_constant_val(constraint.get_constant_val())
+        return new_constraint
 
     ######################################################################
     # Quast API for optimizing tree representation of underlying sets
@@ -276,15 +308,16 @@ class Quast:
     def __get_visualization_label(self, constraint):
         return str(constraint).split(":")[-1].split("}")[0]
 
-    def __extend_space(self, curr_node, extended_space_quast, new_space, old_to_new_ids_map):
+    def __extend_space(self, curr_node, extended_space_quast, old_to_new_ids_map):
         # Todo -- complete
         if curr_node is self.in_node:
             return extended_space_quast.in_node
         elif curr_node is self.out_node:
             return extended_space_quast.out_node
         else:
+            new_space = extended_space_quast.get_space()
             old_constraint = curr_node.constraint
-            old_id_dict = old_constraint.get_id_dict()
+            old_id_dict = old_constraint.get_space().get_id_dict()
 
             new_name_to_coeff_map = {}
             for old_id in old_id_dict:
@@ -308,8 +341,28 @@ class Quast:
             new_true_branch_node = self.__extend_space(curr_node.true_branch_node, extended_space_quast, new_space,
                                                        old_to_new_ids_map)
             new_false_branch_node = self.__extend_space(curr_node.false_branch_node, extended_space_quast, new_space,
-                                                       old_to_new_ids_map)
-            return Node(constraint=new_constraint, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node)
+                                                        old_to_new_ids_map)
+            return Node(constraint=new_constraint, true_branch_node=new_true_branch_node,
+                        false_branch_node=new_false_branch_node)
+
+    def __get_extended_space_and_map(self, extension_space):
+        # Assumes that there are only islpy.dim_type.out type of dimensions.
+        num_extension_out_dims = extension_space.get_space().dim(isl.dim_type.out)
+        extended_space = self.get_space().add_dims(islpy.dim_type.out, num_extension_out_dims)
+        old_ids1 = list(self.space.get_id_dict().keys())
+        old_ids2 = list(extension_space.get_id_dict().keys())
+        var_name = old_ids1[0].get_name()
+        for pos in range(len(old_ids1) + len(old_ids2)):
+            extended_space = extended_space.set_dim_id(isl.dim_type.out, pos, isl.Id(var_name + str(pos)))
+        new_ids = list(extended_space.get_id_dict().keys())
+        mapping = {}
+        len_old_ids1 = len(old_ids1)
+        for i in range(len(new_ids)):
+            if i < len_old_ids1:
+                mapping[old_ids1[i]] = new_ids[i]
+            else:
+                mapping[old_ids2[i - len_old_ids1]] = new_ids[i - len_old_ids1]
+        return extended_space, mapping
 
     ########################################################################
     # Internal implementation of quast optimization functions
@@ -388,7 +441,8 @@ class Quast:
             return None
         elif curr_node.true_branch_node is curr_node.false_branch_node:
             reachable_dict1 = self.__update_predecessors_of_same_child_node(target=curr_node,
-                                                                            reachable_dict=self.__get_reachable_subDAG_as_dict(curr_node))
+                                                                            reachable_dict=self.__get_reachable_subDAG_as_dict(
+                                                                                curr_node))
             reachable_dict2 = self.__prune_equal_children_node(curr_node.true_branch_node)
             return reachable_dict1 if reachable_dict2 is None else reachable_dict2
         else:
@@ -487,7 +541,8 @@ class Quast:
         elif curr_node.is_terminal():
             return False
         else:
-            is_true_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.true_branch_node, reachable_dict)
+            is_true_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.true_branch_node,
+                                                                      reachable_dict)
             is_false_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.false_branch_node,
                                                                        reachable_dict)
             if is_true_reachable or is_false_reachable:
@@ -505,6 +560,7 @@ class Quast:
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.true_branch_node)
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
         return node_set
+
 
 class BasicQuast(Quast):
 
@@ -527,3 +583,9 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
+
+# A = isl.BasicSet("{[x, z]: x >=0 and z >= 0}")
+# C = isl.BasicSet("{[y]: y>=0}")
+# a = Quast(A)
+# c = a.extend_space(C.get_space())
+# print(c)
