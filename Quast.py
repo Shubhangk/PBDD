@@ -139,7 +139,6 @@ class Quast:
         return extended_space_quast
 
 
-
     ######################################################################
     # Quast API for optimizing tree representation of underlying sets
     ######################################################################
@@ -290,62 +289,6 @@ class Quast:
 
     def __get_visualization_label(self, constraint):
         return str(constraint).split(":")[-1].split("}")[0]
-
-    def __extend_space(self, curr_node, extended_space_quast, old_to_new_ids_map):
-        # Todo -- complete
-        if curr_node is self.in_node:
-            return extended_space_quast.in_node
-        elif curr_node is self.out_node:
-            return extended_space_quast.out_node
-        else:
-            new_space = extended_space_quast.get_space()
-            old_constraint = curr_node.constraint
-            old_id_dict = old_constraint.get_space().get_id_dict()
-
-            new_name_to_coeff_map = {}
-            for old_id in old_id_dict:
-                # get the coefficient from old constraint
-                (old_type, old_pos) = old_id_dict[old_id]
-                coeff = old_constraint.get_coefficient_val(type=old_type, pos=old_pos)
-
-                # get the name of new dimension corresponding to old dimension
-                new_id = old_to_new_ids_map[old_id]
-                new_dim_name = new_id.get_name()
-
-                # add {name -> coefficient} to the coefficient dictionary
-                new_name_to_coeff_map[new_dim_name] = coeff
-
-            # set constant of new constraint as that of old constraint
-            constant = old_constraint.get_constant_val()
-            new_name_to_coeff_map[1] = constant
-
-            # create new constraint and return new node
-            new_constraint = isl.Constraint.ineq_from_names(new_space, new_name_to_coeff_map)
-            new_true_branch_node = self.__extend_space(curr_node.true_branch_node, extended_space_quast, new_space,
-                                                       old_to_new_ids_map)
-            new_false_branch_node = self.__extend_space(curr_node.false_branch_node, extended_space_quast, new_space,
-                                                        old_to_new_ids_map)
-            return Node(constraint=new_constraint, true_branch_node=new_true_branch_node,
-                        false_branch_node=new_false_branch_node)
-
-    def __get_extended_space_and_map(self, extension_space):
-        # Assumes that there are only islpy.dim_type.out type of dimensions.
-        num_extension_out_dims = extension_space.get_space().dim(isl.dim_type.out)
-        extended_space = self.get_space().add_dims(islpy.dim_type.out, num_extension_out_dims)
-        old_ids1 = list(self.space.get_id_dict().keys())
-        old_ids2 = list(extension_space.get_id_dict().keys())
-        var_name = old_ids1[0].get_name()
-        for pos in range(len(old_ids1) + len(old_ids2)):
-            extended_space = extended_space.set_dim_id(isl.dim_type.out, pos, isl.Id(var_name + str(pos)))
-        new_ids = list(extended_space.get_id_dict().keys())
-        mapping = {}
-        len_old_ids1 = len(old_ids1)
-        for i in range(len(new_ids)):
-            if i < len_old_ids1:
-                mapping[old_ids1[i]] = new_ids[i]
-            else:
-                mapping[old_ids2[i - len_old_ids1]] = new_ids[i - len_old_ids1]
-        return extended_space, mapping
 
     def __project_quast_into_extended_space(self, curr_node, extended_space, extended_space_quast, quast_in_extension_space=False):
         if curr_node.node_type is Node.IN_NODE:
