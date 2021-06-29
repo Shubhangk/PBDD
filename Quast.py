@@ -116,46 +116,19 @@ class Quast:
         return Quast(self.reconstruct_set().product(quast.reconstruct_set()))
 
     def flat_product(self, quast):
-        # Todo -- complete function
-        pass
+        extension_space = quast.get_space()
+        extended_space = self.__get_extended_space(extension_space)
+        extended_space_self = Quast(space=extended_space)
+        extended_space_quast = Quast(space=extended_space)
+        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_self, False)
+        quast.__project_quast_into_extended_space(quast.root_node, extended_space, extended_space_quast, True)
+        return extended_space_self.intersect(extended_space_quast)
 
     def extend_space(self, extension_space):
         extended_space = self.__get_extended_space(extension_space)
         extended_space_quast = Quast(space=extended_space)
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
-
-    def __project_quast_into_extended_space(self, curr_node, extended_space, extended_space_quast):
-        if curr_node.node_type is Node.IN_NODE:
-            return extended_space_quast.in_node
-        elif curr_node.node_type is Node.OUT_NODE:
-            return extended_space_quast.out_node
-        else:
-            extended_true_branch = self.__project_quast_into_extended_space(curr_node.true_branch_node, extended_space,
-                                                                            extended_space_quast)
-            extended_false_branch = self.__project_quast_into_extended_space(curr_node.false_branch_node, extended_space,
-                                                                            extended_space_quast)
-            extended_node = Node(constraint=self.__project_constraint_into_extended_space(curr_node.constraint, extended_space),
-                            true_branch_node=extended_true_branch, false_branch_node=extended_false_branch)
-            if curr_node is self.root_node:
-                extended_space_quast.root_node = extended_node
-            return extended_node
-
-    def __get_extended_space(self, extension_space):
-        num_new_dims = self.get_space().dim(isl.dim_type.out) + extension_space.dim(isl.dim_type.out)
-        new_space = self.get_space().extend(0, 0, num_new_dims)
-        for i in range(num_new_dims):
-            new_space = new_space.set_dim_id(isl.dim_type.out, i, isl.Id("x" + str(i)))
-        return new_space
-
-    def __project_constraint_into_extended_space(self, constraint, extended_space):
-        new_constraint = isl.Constraint.ineq_from_names(extended_space, {})
-        coefficients = []
-        for i in range(constraint.get_space().dim(isl.dim_type.out)):
-            coefficients.append(constraint.get_coefficient_val(pos=i, type=isl.dim_type.out))
-        new_constraint = new_constraint.set_coefficients(dim_tp=isl.dim_type.out, args=coefficients)
-        new_constraint = new_constraint.set_constant_val(constraint.get_constant_val())
-        return new_constraint
 
     ######################################################################
     # Quast API for optimizing tree representation of underlying sets
@@ -363,6 +336,39 @@ class Quast:
             else:
                 mapping[old_ids2[i - len_old_ids1]] = new_ids[i - len_old_ids1]
         return extended_space, mapping
+
+    def __project_quast_into_extended_space(self, curr_node, extended_space, extended_space_quast, quast_in_extension_space=False):
+        if curr_node.node_type is Node.IN_NODE:
+            return extended_space_quast.in_node
+        elif curr_node.node_type is Node.OUT_NODE:
+            return extended_space_quast.out_node
+        else:
+            extended_true_branch = self.__project_quast_into_extended_space(curr_node.true_branch_node, extended_space,
+                                                                            extended_space_quast, quast_in_extension_space)
+            extended_false_branch = self.__project_quast_into_extended_space(curr_node.false_branch_node, extended_space,
+                                                                            extended_space_quast, quast_in_extension_space)
+            extended_node = Node(constraint=self.__project_constraint_into_extended_space(curr_node.constraint, extended_space, quast_in_extension_space),
+                                 true_branch_node=extended_true_branch, false_branch_node=extended_false_branch)
+            if curr_node is self.root_node:
+                extended_space_quast.root_node = extended_node
+            return extended_node
+
+    def __get_extended_space(self, extension_space):
+        num_new_dims = self.get_space().dim(isl.dim_type.out) + extension_space.dim(isl.dim_type.out)
+        new_space = self.get_space().extend(0, 0, num_new_dims)
+        for i in range(num_new_dims):
+            new_space = new_space.set_dim_id(isl.dim_type.out, i, isl.Id("x" + str(i)))
+        return new_space
+
+    def __project_constraint_into_extended_space(self, constraint, extended_space, constraint_in_extension_space):
+        new_constraint = isl.Constraint.ineq_from_names(extended_space, {})
+        num_out_dims = constraint.get_space().dim(isl.dim_type.out)
+        coefficients = [0]*num_out_dims if constraint_in_extension_space else []
+        for i in range(num_out_dims):
+            coefficients.append(constraint.get_coefficient_val(pos=i, type=isl.dim_type.out))
+        new_constraint = new_constraint.set_coefficients(dim_tp=isl.dim_type.out, args=coefficients)
+        new_constraint = new_constraint.set_constant_val(constraint.get_constant_val())
+        return new_constraint
 
     ########################################################################
     # Internal implementation of quast optimization functions
@@ -584,8 +590,3 @@ class BasicQuast(Quast):
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
 
-# A = isl.BasicSet("{[x, z]: x >=0 and z >= 0}")
-# C = isl.BasicSet("{[y]: y>=0}")
-# a = Quast(A)
-# c = a.extend_space(C.get_space())
-# print(c)
