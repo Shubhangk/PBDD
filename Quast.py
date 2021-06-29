@@ -130,6 +130,16 @@ class Quast:
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
+    def add_dims(self, n):
+        dim_names = [("x" + str(i)) for i in range(n)]
+        extension_space = isl.Space.create_from_names(isl.DEFAULT_CONTEXT, set=dim_names)
+        extended_space = self.__get_extended_space(extension_space)
+        extended_space_quast = Quast(space=extended_space)
+        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
+        return extended_space_quast
+
+
+
     ######################################################################
     # Quast API for optimizing tree representation of underlying sets
     ######################################################################

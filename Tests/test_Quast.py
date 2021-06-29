@@ -242,5 +242,12 @@ class TestQuast(unittest.TestCase):
         c = a.flat_product(b)
         self.assertTrue(c.reconstruct_set() == C)
 
+    def test_add_dims__0(self):
+        A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
+        a = Q.Quast(A)
+        b = a.add_dims(2)
+        self.assertTrue(b.reconstruct_set() == A.add_dims(isl.dim_type.out, 2))
+
+
 if __name__ == '__main__':
     unittest.main()
