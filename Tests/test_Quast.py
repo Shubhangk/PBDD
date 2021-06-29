@@ -226,5 +226,21 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(c.root_node.true_branch_node.node_type == c.root_node.IN_NODE)
         self.assertTrue(c.root_node.false_branch_node.node_type == c.root_node.OUT_NODE)
 
+    def test_extend_space__0(self):
+        A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
+        a = Q.Quast(A)
+        space = isl.Space.create_from_names(isl.DEFAULT_CONTEXT, set=["i", "j"])
+        b = a.extend_space(space)
+        self.assertTrue(b.reconstruct_set() == A.add_dims(isl.dim_type.out, 2))
+
+    def test_flat_product__0(self):
+        A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
+        B = isl.BasicSet("{[x,y]:x >= 0}")
+        C = A.flat_product(B)
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = a.flat_product(b)
+        self.assertTrue(c.reconstruct_set() == C)
+
 if __name__ == '__main__':
     unittest.main()
