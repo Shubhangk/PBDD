@@ -72,6 +72,11 @@ class TestQuast(unittest.TestCase):
         c.prune_redundant_branches()
         self.assertTrue(c.reconstruct_set() == A.intersect(B))
 
+    # Testing quast construction and set reconstruction when the set has an existential dimension
+    def test_reconstruct_set__4(self):
+        C = isl.BasicSet("{[x, y, w]: exists z: w + z >=0 and w >=0 and x + w + 2z >= 0 and y <= x + w}")
+        self.assertTrue(Q.Quast(C).reconstruct_set() == C)
+
     # Description: Constructs a Quast.Quast from an isl.Set, complements the Quast using Quast.complement(),
     # converts back to isl.Set and checks whether complement of initial set
     def test_complement__0(self):
@@ -247,7 +252,6 @@ class TestQuast(unittest.TestCase):
         a = Q.Quast(A)
         b = a.add_dims(2)
         self.assertTrue(b.reconstruct_set() == A.add_dims(isl.dim_type.out, 2))
-
 
 if __name__ == '__main__':
     unittest.main()
