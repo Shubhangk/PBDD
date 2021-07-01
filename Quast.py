@@ -104,7 +104,9 @@ class Quast:
         return Quast(self.reconstruct_set().apply(basic_map))
 
     def project_out(self, dim_type, first, n):
-        return Quast(self.reconstruct_set().project_out(dim_type, first, n))
+        project_out_quast = Quast(space=self.get_space().drop_dims(dim_type, first, n))
+        self.__project_out(dim_type, first, n, self.root_node, project_out_quast)
+        return project_out_quast
 
     def lexmin(self):
         return Quast(self.reconstruct_set().lexmin())
@@ -322,6 +324,21 @@ class Quast:
         new_constraint = new_constraint.set_coefficients(dim_tp=isl.dim_type.out, args=coefficients)
         new_constraint = new_constraint.set_constant_val(constraint.get_constant_val())
         return new_constraint
+
+    def __project_out(self, dim_type, first, n, curr_node, project_out_quast):
+        if curr_node.node_type is Node.IN_NODE:
+            return project_out_quast.in_node
+        elif curr_node.node_type is Node.OUT_NODE:
+            return project_out_quast.out_node
+        else:
+            bset = isl.BasicSet.universe(self.get_space()).add_constraint(curr_node.constraint)
+            new_constraint = bset.project_out(dim_type, first, n).get_constraints()[0]
+            new_true_branch_node = self.__project_out(dim_type, first, n, curr_node.true_branch_node, project_out_quast)
+            new_false_branch_node = self.__project_out(dim_type, first, n, curr_node.false_branch_node, project_out_quast)
+            new_node = Node(constraint=new_constraint, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node)
+            if curr_node is self.root_node:
+                project_out_quast.root_node = new_node
+            return new_node
 
     ########################################################################
     # Internal implementation of quast optimization functions
@@ -542,4 +559,3 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
-
