@@ -253,18 +253,25 @@ class TestQuast(unittest.TestCase):
         b = a.add_dims(2)
         self.assertTrue(b.reconstruct_set() == A.add_dims(isl.dim_type.out, 2))
 
-    def test_project_out__0(self):
-        A = isl.BasicSet("{[x, y, z, w, i, j]: x + y = 2z + 2w and  x = 2i and y = 2j}")
-        a = Q.Quast(A)
-        self.assertTrue(
-            a.project_out(isl.dim_type.set, 2, 2).reconstruct_set() == A.project_out(isl.dim_type.set, 2, 2))
-        self.assertTrue(
-            a.project_out(isl.dim_type.set, 3, 3).reconstruct_set() == A.project_out(isl.dim_type.set, 3, 3))
-        self.assertTrue(
-            a.project_out(isl.dim_type.set, 0, 3).reconstruct_set() == A.project_out(isl.dim_type.set, 0, 3))
-        self.assertTrue(
-            a.project_out(isl.dim_type.set, 0, 1).reconstruct_set() == A.project_out(isl.dim_type.set, 0, 1))
-        self.assertTrue(
-            a.project_out(isl.dim_type.set, 4, 2).reconstruct_set() == A.project_out(isl.dim_type.set, 4, 2))
+    # def test_project_out__0(self):
+    #     A = isl.BasicSet("{[x, y, z, w, i, j]: x + y = 2z + 2w and  x = 2i and y = 2j}")
+    #     a = Q.Quast(A)
+    #     self.assertTrue(
+    #         a.project_out(isl.dim_type.set, 2, 2).reconstruct_set() == A.project_out(isl.dim_type.set, 2, 2))
+    #     self.assertTrue(
+    #         a.project_out(isl.dim_type.set, 3, 3).reconstruct_set() == A.project_out(isl.dim_type.set, 3, 3))
+    #     self.assertTrue(
+    #         a.project_out(isl.dim_type.set, 0, 3).reconstruct_set() == A.project_out(isl.dim_type.set, 0, 3))
+    #     self.assertTrue(
+    #         a.project_out(isl.dim_type.set, 0, 1).reconstruct_set() == A.project_out(isl.dim_type.set, 0, 1))
+    #     self.assertTrue(
+    #         a.project_out(isl.dim_type.set, 4, 2).reconstruct_set() == A.project_out(isl.dim_type.set, 4, 2))
+    #
+    # def test_apply__0(self):
+    #     bmap = isl.BasicMap("{[x,y] -> [2x, 2y]:}")
+    #     bset = isl.BasicSet("{[x,y]: x = 4}")
+    #     quast = Q.Quast(bset)
+    #     self.assertTrue(quast.apply(bmap).reconstruct_set() == bset.apply(bmap))
+
 if __name__ == '__main__':
     unittest.main()
