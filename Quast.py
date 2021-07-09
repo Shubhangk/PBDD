@@ -123,10 +123,10 @@ class Quast:
                 mapped_quast.root_node = new_node
             return new_node
 
-    def project_out(self, dim_type, first, n):
-        project_out_quast = Quast(space=self.get_space().drop_dims(dim_type, first, n))
-        self.__project_out(dim_type, first, n, self.root_node, project_out_quast)
-        return project_out_quast
+    # def project_out(self, dim_type, first, n):
+    #     project_out_quast = Quast(space=self.get_space().drop_dims(dim_type, first, n))
+    #     self.__project_out(dim_type, first, n, self.root_node, project_out_quast)
+    #     return project_out_quast
 
     def lexmin(self):
         return Quast(self.reconstruct_set().lexmin())
@@ -371,7 +371,8 @@ class Quast:
     #             if curr_node is self.root_node:
     #                 project_out_quast.root_node = new_node
     #             return new_node
-    def get_tree_expansion(self):
+
+    def __get_tree_expansion(self):
         expansion_quast = Quast(space=self.get_space())
         self.__expand_quast_into_tree(self.root_node, expansion_quast)
         return expansion_quast
@@ -609,13 +610,3 @@ class BasicQuast(Quast):
         else:
             return Node(constraint=constraints[i], false_branch_node=self.out_node,
                         true_branch_node=self.add_node(constraints=constraints, i=i + 1))
-
-A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
-B = isl.BasicSet("{[x,y]:x >= 0}")
-E = isl.BasicSet("{[x,y]:x >= 0}")
-a = Quast(A)
-b = Quast(B)
-c = a.union(b)
-#c.visualize_tree()
-d = c.get_tree_expansion()
-d.visualize_tree()
