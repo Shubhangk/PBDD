@@ -2,9 +2,8 @@ import inspect
 
 
 class Node(object):
-    # Constant representing whether/which terminal node
-    IN_NODE = 1
-    OUT_NODE = 2
+    # Constant representing whether terminal node
+    TERMINAL = 1
     NON_TERMINAL = 0
 
     # Information about (in)equality represented by node
@@ -30,7 +29,7 @@ class Node(object):
         self.node_type = node_type
 
     def is_terminal(self):
-        return self.node_type is self.IN_NODE or self.node_type is self.OUT_NODE
+        return self.node_type is Node.TERMINAL
 
     def print_node(self):
-        print("Basic set constraint(s): " + str(self.bset) + "\nType: " + str(self.node_type))
+        print("Basic set: " + str(self.bset) + "\nTerminal: " + str(self.node_type == Node.TERMINAL))

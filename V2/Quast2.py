@@ -11,10 +11,6 @@ class Quast:
         space:      islpy.Space that the underlying islpy.Set lives in
         root_node:  Root node of the Quast
     """
-    in_node = None
-    out_node = None
-    root_node = None
-    space = None
 
     def __init__(self, set_=None, space=None, in_node=None, out_node=None):
         if set_ is not None:
@@ -31,14 +27,14 @@ class Quast:
         else:
             if space is None:
                 raise Exception("Cannot initialize Quast with Space None")
-            self.in_node = Node(bset="IN", node_type=Node.IN_NODE) if in_node is None else in_node
-            self.out_node = Node(bset="OUT", node_type=Node.OUT_NODE) if out_node is None else out_node
+            self.in_node = Node(bset="TERMINAL", node_type=Node.TERMINAL) if in_node is None else in_node
+            self.out_node = Node(bset="TERMINAL", node_type=Node.TERMINAL) if out_node is None else out_node
             self.set_space(space)
             self.root_node = None
 
-    ################################
-    # Getters and Setters
-    ################################
+    ################################################################
+    # Data structure specific functions
+    ################################################################
 
     def get_space(self):
         return self.space
@@ -75,13 +71,18 @@ class Quast:
             final_set = final_set.union(basic_set)
         return final_set
 
+    # def complement(self):
+    #     complement_quast = Quast(space=self.get_space())
+    #     complement_quast.root_node = Node(bset=self.root_node.bset,
+    #                                       true_branch_node=self.__complement(self.root_node.true_branch_node,
+    #                                                                          complement_quast),
+    #                                       false_branch_node=self.__complement(self.root_node.false_branch_node,
+    #                                                                           complement_quast))
+    #     return complement_quast
+
     def complement(self):
-        complement_quast = Quast(space=self.get_space())
-        complement_quast.root_node = Node(bset=self.root_node.bset,
-                                          true_branch_node=self.__complement(self.root_node.true_branch_node,
-                                                                             complement_quast),
-                                          false_branch_node=self.__complement(self.root_node.false_branch_node,
-                                                                              complement_quast))
+        complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
+        complement_quast.root_node = self.root_node
         return complement_quast
 
     def visualize_tree(self):
@@ -91,9 +92,9 @@ class Quast:
         nodes = set()
         for arc in arcs:
             if arc[0] not in nodes:
-                dot.node(str(id(arc[0])), self.__get_visualization_label(arc[0].bset))
+                dot.node(str(id(arc[0])), self.__get_visualization_label(arc[0]))
             if arc[1] not in nodes:
-                dot.node(str(id(arc[1])), self.__get_visualization_label(arc[1].bset))
+                dot.node(str(id(arc[1])), self.__get_visualization_label(arc[1]))
             dot.edge(str(id(arc[0])), str(id(arc[1])), label=arc[2])
         if arcs == set():
             dot.node('root', self.root_node.bset)
@@ -211,9 +212,9 @@ class Quast:
                 return new_node
 
     def __apply(self, curr_node, mapped_quast, bmap):
-        if curr_node.node_type is Node.IN_NODE:
+        if curr_node is self.in_node:
             return mapped_quast.in_node
-        elif curr_node.node_type is Node.OUT_NODE:
+        elif curr_node is self.out_node:
             return mapped_quast.out_node
         else:
             new_true_branch = self.__apply(curr_node.true_branch_node, mapped_quast, bmap)
@@ -301,8 +302,14 @@ class Quast:
             self.__visualize_tree(arcs, node.true_branch_node)
             self.__visualize_tree(arcs, node.false_branch_node)
 
-    def __get_visualization_label(self, bset):
-        return str(bset).split(":")[-1].split("}")[0]
+    def __get_visualization_label(self, node):
+        if not node.is_terminal():
+            bset = node.bset
+            return str(bset).split(":")[-1].split("}")[0]
+        elif node is self.in_node:
+            return "IN"
+        else:
+            return "OUT"
 
     def __get_extended_space(self, extension_space):
         num_new_dims = self.get_space().dim(isl.dim_type.out) + extension_space.dim(isl.dim_type.out)
@@ -323,9 +330,9 @@ class Quast:
 
     def __project_quast_into_extended_space(self, curr_node, extended_space, extended_space_quast,
                                             quast_in_extension_space=False):
-        if curr_node.node_type is Node.IN_NODE:
+        if curr_node is self.in_node:
             return extended_space_quast.in_node
-        elif curr_node.node_type is Node.OUT_NODE:
+        elif curr_node is self.out_node:
             return extended_space_quast.out_node
         else:
             extended_true_branch = self.__project_quast_into_extended_space(curr_node.true_branch_node, extended_space,
@@ -352,9 +359,9 @@ class Quast:
         return expansion_quast
 
     def __expand_quast_into_tree(self, curr_node, expansion_quast):
-        if curr_node.node_type == Node.IN_NODE:
+        if curr_node is self.in_node:
             return expansion_quast.in_node
-        elif curr_node.node_type == Node.OUT_NODE:
+        elif curr_node is self.out_node:
             return expansion_quast.out_node
         else:
             expanded_true_branch_node = self.__expand_quast_into_tree(curr_node.true_branch_node, expansion_quast)
@@ -571,8 +578,8 @@ class Quast:
 class BasicQuast(Quast):
 
     def __init__(self, basic_set=None):
-        self.in_node = Node(bset="IN", node_type=Node.IN_NODE)
-        self.out_node = Node(bset="OUT", node_type=Node.OUT_NODE)
+        self.in_node = Node(bset="TERMINAL", node_type=Node.TERMINAL)
+        self.out_node = Node(bset="TERMINAL", node_type=Node.TERMINAL)
         self.root_node = None
         self.space = None
 

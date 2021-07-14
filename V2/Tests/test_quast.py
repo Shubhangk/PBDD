@@ -215,8 +215,8 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(e.reconstruct_set() == A.intersect(B).union(C))
         space = A.get_space()
         self.assertTrue(e.root_node.bset == isl.BasicSet.from_constraint(isl.Constraint.ineq_from_names(space, {1: 0, "y": -1})))
-        self.assertTrue(e.root_node.true_branch_node.node_type == e.root_node.true_branch_node.OUT_NODE)
-        self.assertTrue(e.root_node.false_branch_node.node_type == e.root_node.true_branch_node.IN_NODE)
+        self.assertTrue(e.root_node.true_branch_node is e.out_node)
+        self.assertTrue(e.root_node.false_branch_node is e.in_node)
 
     def test_prune_isomorphic_subtrees__0(self):
         A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
@@ -231,12 +231,12 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(c.root_node.bset == isl.BasicSet.from_constraint(isl.Constraint.ineq_from_names(space, {"y": 1})))
         self.assertTrue(c.root_node.true_branch_node is c.root_node.false_branch_node)
         self.assertTrue(c.root_node.true_branch_node.bset == isl.BasicSet.from_constraint(isl.Constraint.ineq_from_names(space, {"x": 1})))
-        self.assertTrue(c.root_node.true_branch_node.true_branch_node.node_type == c.root_node.IN_NODE)
-        self.assertTrue(c.root_node.false_branch_node.false_branch_node.node_type == c.root_node.OUT_NODE)
+        self.assertTrue(c.root_node.true_branch_node.true_branch_node is c.in_node)
+        self.assertTrue(c.root_node.false_branch_node.false_branch_node is c.out_node)
         c.prune_equal_children_node()
         self.assertTrue(c.root_node.bset == isl.BasicSet.from_constraint(isl.Constraint.ineq_from_names(space, {"x": 1})))
-        self.assertTrue(c.root_node.true_branch_node.node_type == c.root_node.IN_NODE)
-        self.assertTrue(c.root_node.false_branch_node.node_type == c.root_node.OUT_NODE)
+        self.assertTrue(c.root_node.true_branch_node is c.in_node)
+        self.assertTrue(c.root_node.false_branch_node is c.out_node)
     #
     def test_extend_space__0(self):
         A = isl.BasicSet("{[x, y]: y >= 0 and x >=0}")
