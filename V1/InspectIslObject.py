@@ -85,15 +85,3 @@ def print_local_space_info(lspace):
     print("id dict: " + str(lspace.get_id_dict()))
     print("var dict: " + str(lspace.get_var_dict()))
     print()
-
-
-
-# A = isl.BasicSet("{[x, y, z]: (z) mod 2 = 0 and x = 2z and x = 3y and (y) mod 3 = 0 and y + z >= 9}")
-# # for i in range(len(A.get_constraints())):
-# #     print("CONSTRAINT " + str(i))
-# #     constraint = A.get_constraints()[i]
-# #     print_constraint_info(constraint)
-# C = isl.BasicSet("{[x, y, z]: (z) mod 2 = 0 and x = 2z and x = 3y and (y) mod 3 = 0 and y + z >= 9 and exists e : y = 4e}")
-# B = C.compute_divs()
-# print(C)
-# print(B)
