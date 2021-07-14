@@ -97,7 +97,31 @@ class Quast:
         dot.render('visualization-output/quast', view=True)
 
     def is_empty(self):
-        return self.reconstruct_set().is_empty()
+        return self.__is_empty(self.root_node, [])
+
+    def __is_empty(self, curr_node, root_to_node_path):
+        if curr_node is self.in_node:
+            if not root_to_node_path:
+                return True
+            else:
+                bset = root_to_node_path[0]
+                for node_bset in root_to_node_path:
+                    bset = bset.intersect(node_bset)
+                return bset.is_empty()
+        elif curr_node is self.out_node:
+            return True
+        else:
+            root_to_node_path.append(curr_node.bset)
+            is_true_branch_empty = self.__is_empty(curr_node.true_branch_node, root_to_node_path)
+            if not is_true_branch_empty:
+                return False
+            root_to_node_path[-1] = self.__negate_bset(curr_node.bset)
+            is_false_branch_empty = self.__is_empty(curr_node.false_branch_node, root_to_node_path)
+            if not is_false_branch_empty:
+                return False
+            else:
+                root_to_node_path.pop()
+                return True
 
     def is_equal(self, quast):
         return self.reconstruct_set() == quast.reconstruct_set()
