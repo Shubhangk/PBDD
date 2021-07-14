@@ -1,0 +1,9 @@
+// Quast Visualization
+digraph {
+	4385744264 [label=" y = 0 "]
+	4385743984 [label=IN]
+	4385744264 -> 4385743984 [label=F]
+	4385744264 [label=" y = 0 "]
+	4385743984 [label=IN]
+	4385744264 -> 4385743984 [label=T]
+}
