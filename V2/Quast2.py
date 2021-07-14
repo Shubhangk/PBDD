@@ -2,6 +2,7 @@ import islpy as isl
 from graphviz import Digraph
 from V2.Node import *
 
+
 class Quast:
     """
     Quasi-Affine solution tree representation of islpy.Sets. Each Quast instance has the following variable attributes
@@ -97,31 +98,10 @@ class Quast:
         dot.render('visualization-output/quast', view=True)
 
     def is_empty(self):
-        return self.__is_empty(self.root_node, [])
+        return self.__is_empty(self.root_node, isl.BasicSet.universe(self.get_space()))
 
-    def __is_empty(self, curr_node, root_to_node_path):
-        if curr_node is self.in_node:
-            if not root_to_node_path:
-                return True
-            else:
-                bset = root_to_node_path[0]
-                for node_bset in root_to_node_path:
-                    bset = bset.intersect(node_bset)
-                return bset.is_empty()
-        elif curr_node is self.out_node:
-            return True
-        else:
-            root_to_node_path.append(curr_node.bset)
-            is_true_branch_empty = self.__is_empty(curr_node.true_branch_node, root_to_node_path)
-            if not is_true_branch_empty:
-                return False
-            root_to_node_path[-1] = self.__negate_bset(curr_node.bset)
-            is_false_branch_empty = self.__is_empty(curr_node.false_branch_node, root_to_node_path)
-            if not is_false_branch_empty:
-                return False
-            else:
-                root_to_node_path.pop()
-                return True
+    def is_subset(self, quast):
+        return self.intersect(quast.complement()).is_empty()
 
     def is_equal(self, quast):
         return self.reconstruct_set() == quast.reconstruct_set()
@@ -154,7 +134,7 @@ class Quast:
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
-    def project_out(self, dim_type, first, n,):
+    def project_out(self, dim_type, first, n, ):
         T = self.__get_tree_expansion()
         project_out_quast = Quast(space=T.get_space())
         root_to_node_path = []
@@ -164,6 +144,22 @@ class Quast:
     ########################################################################
     # Internal implementation of set operations in quast representation
     ########################################################################
+
+    def __is_empty(self, curr_node, root_to_node_path_bset):
+        if curr_node is self.in_node:
+            return root_to_node_path_bset.is_empty()
+        elif curr_node is self.out_node:
+            return True
+        elif root_to_node_path_bset.plain_is_empty():
+            return True
+        else:
+            true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
+            is_true_branch_empty = self.__is_empty(curr_node.true_branch_node, true_root_to_node_path_bset)
+            if not is_true_branch_empty:
+                return False
+            false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
+            is_false_branch_empty = self.__is_empty(curr_node.false_branch_node, false_root_to_node_path_bset)
+            return is_false_branch_empty
 
     def __project_out(self, tree_expansion, curr_node, project_out_quast, root_to_node_path, dim_type, first, n):
         if curr_node is tree_expansion.in_node:
@@ -190,7 +186,7 @@ class Quast:
             elif new_constraint.is_empty():
                 root_to_node_path.append(curr_constraint.complement())
                 new_false_branch = self.__project_out(tree_expansion, curr_node.false_branch_node, project_out_quast,
-                                                     root_to_node_path, dim_type, first, n)
+                                                      root_to_node_path, dim_type, first, n)
                 root_to_node_path.pop()
                 if curr_node is tree_expansion.root_node:
                     project_out_quast.root_node = new_false_branch
@@ -356,8 +352,9 @@ class Quast:
                                                                              quast_in_extension_space)
             extended_bset = isl.BasicSet.universe(extended_space)
             for constraint in curr_node.bset.get_constraints():
-                extended_bset = extended_bset.add_constraint(self.__project_constraint_into_extended_space(constraint, extended_space,
-                                                                                           quast_in_extension_space))
+                extended_bset = extended_bset.add_constraint(
+                    self.__project_constraint_into_extended_space(constraint, extended_space,
+                                                                  quast_in_extension_space))
             extended_node = Node(bset=extended_bset, true_branch_node=extended_true_branch,
                                  false_branch_node=extended_false_branch)
             if curr_node is self.root_node:
@@ -584,6 +581,7 @@ class Quast:
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.true_branch_node)
         node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
         return node_set
+
 
 class BasicQuast(Quast):
 

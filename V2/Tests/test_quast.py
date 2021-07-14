@@ -177,6 +177,20 @@ class TestQuast(unittest.TestCase):
         a2 = Q.Quast(A2)
         self.assertTrue(a1.intersect(a2).is_empty())
 
+    def test_is_subset__0(self):
+        A1 = isl.Set("{[x,y,z]: x >= -1}")
+        A2 = isl.Set("{[x,y,z]: x >= 0 and y>= 0 or (x + y <= 9 and z + x >= 2 and x >=0 )}")
+        a1 = Q.Quast(A1)
+        a2 = Q.Quast(A2)
+        self.assertTrue(a2.is_subset(a1))
+
+    def test_is_subset__1(self):
+        A1 = isl.Set("{[x,y,z]: x < -1}")
+        A2 = isl.Set("{[x,y,z]: x >= 0 and y>= 0 or (x + y <= 9 and z + x >= 2 and x >=0 )}")
+        a1 = Q.Quast(A1)
+        a2 = Q.Quast(A2)
+        self.assertFalse(a2.is_subset(a1))
+
     def test_prune_equal_children_node__0(self):
         A = isl.BasicSet("{[x]: x > 0}")
         B = isl.BasicSet("{[x]: x < 0}")
