@@ -71,15 +71,6 @@ class Quast:
             final_set = final_set.union(basic_set)
         return final_set
 
-    # def complement(self):
-    #     complement_quast = Quast(space=self.get_space())
-    #     complement_quast.root_node = Node(bset=self.root_node.bset,
-    #                                       true_branch_node=self.__complement(self.root_node.true_branch_node,
-    #                                                                          complement_quast),
-    #                                       false_branch_node=self.__complement(self.root_node.false_branch_node,
-    #                                                                           complement_quast))
-    #     return complement_quast
-
     def complement(self):
         complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
         complement_quast.root_node = self.root_node
@@ -280,16 +271,6 @@ class Quast:
 
     def __negate_bset(self, bset):
         return bset.complement()
-
-    def __complement(self, curr_node, complement_quast):
-        if curr_node == self.in_node:
-            return complement_quast.out_node
-        elif curr_node == self.out_node:
-            return complement_quast.in_node
-        else:
-            return Node(bset=curr_node.bset,
-                        true_branch_node=self.__complement(curr_node.true_branch_node, complement_quast),
-                        false_branch_node=self.__complement(curr_node.false_branch_node, complement_quast))
 
     def __visualize_tree(self, arcs, node):
         if node.is_terminal():

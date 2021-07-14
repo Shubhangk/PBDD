@@ -1,9 +1,0 @@
-// Quast Visualization
-digraph {
-	4385675528 [label=" x >= 0 "]
-	4385674912 [label=OUT]
-	4385675528 -> 4385674912 [label=F]
-	4385675528 [label=" x >= 0 "]
-	4385327928 [label=IN]
-	4385675528 -> 4385327928 [label=T]
-}
