@@ -16,10 +16,13 @@ class Quast:
     root_node = None
     space = None
 
-    def __init__(self, set=None, space=None):
-        if set is not None:
+    def __init__(self, set_=None, space=None, in_node=None, out_node=None):
+        """
+
+        """
+        if set_ is not None:
             T = None
-            for basic_set in set.get_basic_sets():
+            for basic_set in set_.get_basic_sets():
                 if T is None:
                     T = BasicQuast(basic_set)
                 else:
@@ -27,12 +30,12 @@ class Quast:
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
-            if space is None:
-                space = T.get_space()
-            self.set_space(space)
+            self.set_space(T.get_space())
         else:
-            self.in_node = Node(bset="IN", node_type=Node.IN_NODE)
-            self.out_node = Node(bset="OUT", node_type=Node.OUT_NODE)
+            if space is None:
+                raise Exception("Cannot initialize Quast with Space None")
+            self.in_node = Node(bset="IN", node_type=Node.IN_NODE) if in_node is None else in_node
+            self.out_node = Node(bset="OUT", node_type=Node.OUT_NODE) if out_node is None else out_node
             self.set_space(space)
             self.root_node = None
 
