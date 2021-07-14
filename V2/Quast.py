@@ -20,6 +20,7 @@ class Quast:
                     T = BasicQuast(basic_set)
                 else:
                     T = T.union(BasicQuast(basic_set))
+                # T.simplify()
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
@@ -50,9 +51,11 @@ class Quast:
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
         union_quast = Quast(space=quast.get_space(), in_node=quast.in_node, out_node=quast.out_node)
-        quast1 = self
-        quast2 = quast
-        self.__union(quast1, quast2, self.root_node, union_quast)
+        memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
+        union_quast.root_node = self.__union(self.root_node, memo)
+        # quast1 = self
+        # quast2 = quast
+        # self.__union(quast1, quast2, self.root_node, union_quast)
         return union_quast
 
     def intersect(self, quast):
@@ -233,19 +236,16 @@ class Quast:
                 intersection_quast.root_node = new_node
             return new_node
 
-    def __union(self, quast1, quast2, quast1_curr_node, union_quast):
-        if quast1_curr_node is quast1.in_node:
-            return union_quast.in_node
-        elif quast1_curr_node is quast1.out_node:
-            return quast2.root_node
-        else:
-            true_branch_node = self.__union(quast1, quast2, quast1_curr_node.true_branch_node, union_quast)
-            false_branch_node = self.__union(quast1, quast2, quast1_curr_node.false_branch_node, union_quast)
-            bset = quast1_curr_node.bset
-            new_node = Node(bset=bset, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
-            if quast1_curr_node is quast1.root_node:
-                union_quast.root_node = new_node
-            return new_node
+    def __union(self, curr_node, memo):
+        if curr_node in memo:
+            return memo[curr_node]
+        true_branch_node = self.__union(curr_node.true_branch_node, memo)
+        false_branch_node = self.__union(curr_node.false_branch_node, memo)
+        bset = curr_node.bset
+        new_node = Node(bset=bset, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
+        memo[curr_node] = new_node
+        return new_node
+
 
     def __reconstruct_set(self, curr_node, curr_constraints):
         if curr_node is self.out_node:
@@ -385,6 +385,12 @@ class Quast:
                     else:
                         can_reach_node1[node1] = node2
                         self.__update_subDAG(can_reach_node1, self.root_node)
+
+    def simplify(self):
+        self.prune_redundant_branches()
+        self.prune_emptyset_branches()
+        self.prune_isomorphic_subtrees()
+        self.prune_equal_children_node()
 
     ########################################################################
     # Internal implementation of quast optimization functions
