@@ -62,9 +62,10 @@ class Quast:
     def intersect(self, quast):
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
-        intersection_quast = Quast(space=self.get_space())
-        intersection_quast.root_node = intersection_quast.__intersect(node1=self.root_node, node2=quast.root_node,
-                                                                      new_node2=[None])
+        intersection_quast = Quast(space=self.get_space(), in_node=quast.in_node, out_node=quast.out_node)
+        quast1 = self
+        quast2 = quast
+        self.__intersect(quast1, quast2, self.root_node, intersection_quast)
         return intersection_quast
 
     def reconstruct_set(self):
@@ -226,28 +227,19 @@ class Quast:
                 mapped_quast.root_node = new_node
             return new_node
 
-    def __intersect(self, node1, node2, new_node2):
-        if node1 is None:
-            if node2.node_type is node2.IN_NODE:
-                return self.in_node
-            elif node2.node_type is node2.OUT_NODE:
-                return self.out_node
-            else:
-                true_branch_node = self.__intersect(node1=node1, node2=node2.true_branch_node, new_node2=new_node2)
-                false_branch_node = self.__intersect(node1=node1, node2=node2.false_branch_node, new_node2=new_node2)
-                return Node(bset=node2.bset, false_branch_node=false_branch_node,
-                            true_branch_node=true_branch_node)
-        if node1.node_type is node1.IN_NODE:
-            if new_node2[0] is None:
-                new_node2[0] = self.__intersect(node1=None, node2=node2, new_node2=new_node2)
-            return new_node2[0]
-        elif node1.node_type is node1.OUT_NODE:
-            return self.out_node
+    def __intersect(self, quast1, quast2, quast1_curr_node, intersection_quast):
+        if quast1_curr_node is quast1.in_node:
+            return quast2.root_node
+        elif quast1_curr_node is quast1.out_node:
+            return intersection_quast.out_node
         else:
-            true_branch_node = self.__intersect(node1=node1.true_branch_node, node2=node2, new_node2=new_node2)
-            false_branch_node = self.__intersect(node1=node1.false_branch_node, node2=node2, new_node2=new_node2)
-            return Node(bset=node1.bset, false_branch_node=false_branch_node,
-                        true_branch_node=true_branch_node)
+            true_branch_node = self.__intersect(quast1, quast2, quast1_curr_node.true_branch_node, intersection_quast)
+            false_branch_node = self.__intersect(quast1, quast2, quast1_curr_node.false_branch_node, intersection_quast)
+            bset = quast1_curr_node.bset
+            new_node = Node(bset=bset, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
+            if quast1_curr_node is quast1.root_node:
+                intersection_quast.root_node = new_node
+            return new_node
 
     def __union(self, quast1, quast2, quast1_curr_node, union_quast):
         if quast1_curr_node is quast1.in_node:
