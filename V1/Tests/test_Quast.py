@@ -1,5 +1,5 @@
 import unittest
-import Quast as Q
+from V1 import Quast as Q
 import islpy as isl
 
 
