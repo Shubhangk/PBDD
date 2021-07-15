@@ -20,7 +20,6 @@ class Quast:
                     T = BasicQuast(basic_set)
                 else:
                     T = BasicQuast(basic_set).union(T)
-                # T.simplify()
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
@@ -238,7 +237,6 @@ class Quast:
         memo[curr_node] = new_node
         return new_node
 
-
     def __reconstruct_set(self, curr_node, curr_constraints):
         if curr_node is self.out_node:
             return []
@@ -269,11 +267,14 @@ class Quast:
             return
         else:
             true_branch_arc = (node, node.true_branch_node, "T")
+            if true_branch_arc not in arcs:
+                arcs.add(true_branch_arc)
+                self.__visualize_tree(arcs, node.true_branch_node)
+
             false_branch_arc = (node, node.false_branch_node, "F")
-            arcs.add(true_branch_arc)
-            arcs.add(false_branch_arc)
-            self.__visualize_tree(arcs, node.true_branch_node)
-            self.__visualize_tree(arcs, node.false_branch_node)
+            if false_branch_arc not in arcs:
+                arcs.add(false_branch_arc)
+                self.__visualize_tree(arcs, node.false_branch_node)
 
     def __get_visualization_label(self, node):
         if not node.is_terminal():
@@ -382,7 +383,7 @@ class Quast:
         self.prune_redundant_branches()
         self.prune_emptyset_branches()
         self.prune_isomorphic_subtrees()
-        self.prune_equal_children_node()
+        #self.prune_equal_children_node()
 
     ########################################################################
     # Internal implementation of quast optimization functions
