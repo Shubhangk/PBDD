@@ -19,7 +19,7 @@ class Quast:
                 if T is None:
                     T = BasicQuast(basic_set)
                 else:
-                    T = T.union(BasicQuast(basic_set))
+                    T = BasicQuast(basic_set).union(T)
                 # T.simplify()
             self.root_node = T.root_node
             self.in_node = T.in_node
@@ -53,18 +53,14 @@ class Quast:
         union_quast = Quast(space=quast.get_space(), in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
-        # quast1 = self
-        # quast2 = quast
-        # self.__union(quast1, quast2, self.root_node, union_quast)
         return union_quast
 
     def intersect(self, quast):
         if self.get_space() != quast.get_space():
             raise Exception("spaces don't match")
         intersection_quast = Quast(space=self.get_space(), in_node=quast.in_node, out_node=quast.out_node)
-        quast1 = self
-        quast2 = quast
-        self.__intersect(quast1, quast2, self.root_node, intersection_quast)
+        memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
+        intersection_quast.root_node = self.__intersect(self.root_node, memo)
         return intersection_quast
 
     def reconstruct_set(self):
@@ -222,19 +218,15 @@ class Quast:
                 mapped_quast.root_node = new_node
             return new_node
 
-    def __intersect(self, quast1, quast2, quast1_curr_node, intersection_quast):
-        if quast1_curr_node is quast1.in_node:
-            return quast2.root_node
-        elif quast1_curr_node is quast1.out_node:
-            return intersection_quast.out_node
-        else:
-            true_branch_node = self.__intersect(quast1, quast2, quast1_curr_node.true_branch_node, intersection_quast)
-            false_branch_node = self.__intersect(quast1, quast2, quast1_curr_node.false_branch_node, intersection_quast)
-            bset = quast1_curr_node.bset
-            new_node = Node(bset=bset, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
-            if quast1_curr_node is quast1.root_node:
-                intersection_quast.root_node = new_node
-            return new_node
+    def __intersect(self, curr_node, memo):
+        if curr_node in memo:
+            return memo[curr_node]
+        true_branch_node = self.__intersect(curr_node.true_branch_node, memo)
+        false_branch_node = self.__intersect(curr_node.false_branch_node, memo)
+        bset = curr_node.bset
+        new_node = Node(bset=bset, false_branch_node=false_branch_node, true_branch_node=true_branch_node)
+        memo[curr_node] = new_node
+        return new_node
 
     def __union(self, curr_node, memo):
         if curr_node in memo:

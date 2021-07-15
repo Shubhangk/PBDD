@@ -5,14 +5,14 @@ class Node(object):
     # Constant representing whether terminal node
     TERMINAL = 1
     NON_TERMINAL = 0
-
-    # Information about (in)equality represented by node
-    bset = None
-    node_type = None
-
-    # Pointers to true/false subtrees and parent node. Note that there may be multiple parents as the graph is a DAG
-    true_branch_node = None
-    false_branch_node = None
+    #
+    # # Information about (in)equality represented by node
+    # bset = None
+    # node_type = None
+    #
+    # # Pointers to true/false subtrees and parent node. Note that there may be multiple parents as the graph is a DAG
+    # true_branch_node = None
+    # false_branch_node = None
 
     # Description: overriding this function should make the class immutable (except at initialization)
     def __setattr__(self, *args):
