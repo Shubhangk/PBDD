@@ -24,7 +24,7 @@ class Quast:
                     T = bquast
                 else:
                     T = bquast.union(T)
-                self.update_num_nodes(bquast.get_tree_size())
+            self.update_num_nodes(T.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
@@ -73,6 +73,7 @@ class Quast:
         union_quast = Quast(space=quast.get_space(), in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
+        union_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
         return union_quast
 
     def intersect(self, quast):
