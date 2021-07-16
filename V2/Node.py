@@ -1,6 +1,3 @@
-import inspect
-
-
 class Node(object):
     TERMINAL = 1
     NON_TERMINAL = 0
