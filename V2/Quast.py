@@ -378,7 +378,7 @@ class Quast:
         self.__prune_redundant_branches(self.root_node, [])
 
     def prune_emptyset_branches(self):
-        MAX_MODIFICATIONS = 1000
+        MAX_MODIFICATIONS = 10
         num_modifications = 0
         modified = True
         while modified and num_modifications < MAX_MODIFICATIONS:
@@ -389,6 +389,14 @@ class Quast:
         return self.__prune_equal_children_node(self.root_node)
 
     def prune_isomorphic_subtrees(self):
+        MAX_MODIFICATIONS = 10
+        num_modifications = 0
+        modified = True
+        while modified and num_modifications < MAX_MODIFICATIONS:
+            modified = self.__detect_and_prune_isomorphic_subtrees()
+            num_modifications = num_modifications + 1
+
+    def __detect_and_prune_isomorphic_subtrees(self):
         node_set = self.__get_node_set()
         memo_table = {}
         for node1 in node_set:
@@ -402,6 +410,8 @@ class Quast:
                     else:
                         can_reach_node1[node1] = node2
                         self.__update_subDAG(can_reach_node1, self.root_node)
+                    return True
+        return False
 
     def simplify(self):
         self.prune_redundant_branches()
