@@ -2,7 +2,6 @@ import islpy as isl
 from graphviz import Digraph
 from V2.Node import *
 
-
 class Quast:
     """
     Quasi-Affine solution tree representation of islpy.Sets. Each Quast instance has the following variable attributes
@@ -10,20 +9,27 @@ class Quast:
         out_node:   Terminal node indicating non-containment inside underlying islpy.Set
         space:      islpy.Space that the underlying islpy.Set lives in
         root_node:  Root node of the Quast
+        num_nodes:  Number of nodes in the Quast
     """
 
     def __init__(self, set_=None, space=None, in_node=None, out_node=None):
+        self.num_nodes = 0
+
+        # initialize when isl.Set is provided
         if set_ is not None:
             T = None
             for basic_set in set_.get_basic_sets():
+                bquast = BasicQuast(basic_set)
                 if T is None:
-                    T = BasicQuast(basic_set)
+                    T = bquast
                 else:
-                    T = BasicQuast(basic_set).union(T)
+                    T = bquast.union(T)
+                self.update_num_nodes(bquast.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
             self.set_space(T.get_space())
+        # initialize when isl.Set is not provided (also from super.__init__() call from BasicQuast)
         else:
             if space is None:
                 raise Exception("Cannot initialize Quast with Space None")
@@ -41,6 +47,21 @@ class Quast:
 
     def set_space(self, new_space):
         self.space = new_space
+
+    def get_tree_size(self):
+        return self.num_nodes
+
+    def set_tree_size(self, tree_size):
+        self.num_nodes = tree_size
+
+    def increment_tree_size(self):
+        self.num_nodes = self.num_nodes + 1
+
+    def __decrement_tree_size(self):
+        self.num_nodes = self.num_nodes - 1
+
+    def update_num_nodes(self, num_additions):
+        self.num_nodes = self.num_nodes + num_additions
 
     ####################################
     # Quast API for set operations
@@ -60,6 +81,7 @@ class Quast:
         intersection_quast = Quast(space=self.get_space(), in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
+        intersection_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
         return intersection_quast
 
     def reconstruct_set(self):
@@ -557,22 +579,16 @@ class Quast:
 
 class BasicQuast(Quast):
 
-    def __init__(self, basic_set=None):
-        self.in_node = Node(bset="TERMINAL", node_type=Node.TERMINAL)
-        self.out_node = Node(bset="TERMINAL", node_type=Node.TERMINAL)
-        self.root_node = None
-        self.space = None
+    def __init__(self, bset=None, space=None):
+        space = bset.get_space() if bset is not None else space
+        super().__init__(set_=None, space=space)
 
-        if basic_set is not None:
-            constraints = [isl.BasicSet.from_constraint(constraint) for constraint in basic_set.get_constraints()]
-            if len(constraints) is not 0:
-                self.root_node = Node(bset=constraints[0], false_branch_node=self.out_node,
-                                      true_branch_node=self.__add_node(constraints=constraints, i=1))
-                self.space = self.root_node.bset.get_space()
-
-    def __add_node(self, constraints, i):
-        if i is len(constraints):
-            return self.in_node
-        else:
-            return Node(bset=constraints[i], false_branch_node=self.out_node,
-                        true_branch_node=self.__add_node(constraints=constraints, i=i + 1))
+        # construct tree from bset
+        if bset is not None:
+            next_true_branch_node = self.in_node
+            constraints_as_bsets = [isl.BasicSet.from_constraint(constraint) for constraint in bset.get_constraints()]
+            for bset_constraint in constraints_as_bsets:
+                node = Node(bset=bset_constraint, false_branch_node=self.out_node, true_branch_node=next_true_branch_node)
+                next_true_branch_node = node
+            self.update_num_nodes(len(constraints_as_bsets))
+            self.root_node = next_true_branch_node
