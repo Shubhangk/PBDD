@@ -25,7 +25,6 @@ class Quast:
                     T = bquast
                 else:
                     T = bquast.union(T)
-                    #T.simplify()
             self.update_num_nodes(T.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
@@ -93,30 +92,6 @@ class Quast:
         for basic_set in basic_set_list:
             final_set = final_set.union(basic_set)
         return final_set
-    #
-    # def reconstruct_set(self):
-    #     return self.__reconstruct_set_(self.root_node, isl.BasicSet.universe(self.get_space()))
-    #
-    # def __reconstruct_set_(self, curr_node, root_to_node_bset):
-    #     if curr_node is self.out_node:
-    #         return isl.BasicSet.empty(self.get_space())
-    #     elif curr_node is self.in_node:
-    #         return root_to_node_bset
-    #     else:
-    #         futures_objects = []
-    #         with concurrent.futures.ProcessPoolExecutor() as executor:
-    #             true_branch_bset = root_to_node_bset.intersect(curr_node.bset)
-    #             if not true_branch_bset.is_empty():
-    #                 futures_objects.append(executor.submit(self.__reconstruct_set, curr_node.true_branch_node, true_branch_bset))
-    #             if curr_node.true_branch_node is not curr_node.false_branch_node:
-    #                 false_branch_bset = root_to_node_bset.intersect(self.__negate_bset(curr_node.bset))
-    #                 if not false_branch_bset.is_empty():
-    #                     futures_objects[1] = executor.submit(self.__reconstruct_set, curr_node.false_branch_node, false_branch_bset)
-    #             final_set = isl.BasicSet.universe(self.get_space())
-    #             for f in concurrent.futures.as_completed(futures_objects):
-    #                 final_set = final_set.union(f.result())
-    #
-    #             return final_set
 
     def complement(self):
         complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
