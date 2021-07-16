@@ -1,6 +1,7 @@
 import islpy as isl
 from graphviz import Digraph
 from V2.Node import *
+import concurrent.futures
 
 class Quast:
     """
@@ -24,6 +25,7 @@ class Quast:
                     T = bquast
                 else:
                     T = bquast.union(T)
+                    #T.simplify()
             self.update_num_nodes(T.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
@@ -91,6 +93,30 @@ class Quast:
         for basic_set in basic_set_list:
             final_set = final_set.union(basic_set)
         return final_set
+    #
+    # def reconstruct_set(self):
+    #     return self.__reconstruct_set_(self.root_node, isl.BasicSet.universe(self.get_space()))
+    #
+    # def __reconstruct_set_(self, curr_node, root_to_node_bset):
+    #     if curr_node is self.out_node:
+    #         return isl.BasicSet.empty(self.get_space())
+    #     elif curr_node is self.in_node:
+    #         return root_to_node_bset
+    #     else:
+    #         futures_objects = []
+    #         with concurrent.futures.ProcessPoolExecutor() as executor:
+    #             true_branch_bset = root_to_node_bset.intersect(curr_node.bset)
+    #             if not true_branch_bset.is_empty():
+    #                 futures_objects.append(executor.submit(self.__reconstruct_set, curr_node.true_branch_node, true_branch_bset))
+    #             if curr_node.true_branch_node is not curr_node.false_branch_node:
+    #                 false_branch_bset = root_to_node_bset.intersect(self.__negate_bset(curr_node.bset))
+    #                 if not false_branch_bset.is_empty():
+    #                     futures_objects[1] = executor.submit(self.__reconstruct_set, curr_node.false_branch_node, false_branch_bset)
+    #             final_set = isl.BasicSet.universe(self.get_space())
+    #             for f in concurrent.futures.as_completed(futures_objects):
+    #                 final_set = final_set.union(f.result())
+    #
+    #             return final_set
 
     def complement(self):
         complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
@@ -260,26 +286,26 @@ class Quast:
         memo[curr_node] = new_node
         return new_node
 
-    def __reconstruct_set(self, curr_node, curr_constraints):
+    def __reconstruct_set(self, curr_node, root_to_node_bsets):
         if curr_node is self.out_node:
             return []
         elif curr_node is self.in_node:
             bset = isl.BasicSet.universe(self.get_space())
-            for constraint in curr_constraints:
-                bset = bset.intersect(constraint)
+            for constraint_bset in root_to_node_bsets:
+                bset = bset.intersect(constraint_bset)
             if bset.is_empty():
                 return []
             else:
                 return [bset]
         elif curr_node.true_branch_node is curr_node.false_branch_node:
-            return self.__reconstruct_set(curr_node.true_branch_node, curr_constraints)
+            return self.__reconstruct_set(curr_node.true_branch_node, root_to_node_bsets)
         else:
-            curr_constraints.append(curr_node.bset)
-            bsets_from_true = self.__reconstruct_set(curr_node.true_branch_node, curr_constraints)
-            curr_constraints.pop()
-            curr_constraints.append(self.__negate_bset(curr_node.bset))
-            bsets_from_false = self.__reconstruct_set(curr_node.false_branch_node, curr_constraints)
-            curr_constraints.pop()
+            root_to_node_bsets.append(curr_node.bset)
+            bsets_from_true = self.__reconstruct_set(curr_node.true_branch_node, root_to_node_bsets)
+            root_to_node_bsets.pop()
+            root_to_node_bsets.append(self.__negate_bset(curr_node.bset))
+            bsets_from_false = self.__reconstruct_set(curr_node.false_branch_node, root_to_node_bsets)
+            root_to_node_bsets.pop()
             return bsets_from_true + bsets_from_false
 
     def __negate_bset(self, bset):
@@ -487,14 +513,16 @@ class Quast:
             return new_node
 
     def __are_subtrees_isomorphic(self, root1, root2, memo_table):
-        if (root1, root2) in memo_table:
+        if not self.__are_nodes_equal(root1, root2):
+            return False
+        elif (root1, root2) in memo_table:
             return memo_table[(root1, root2)]
         elif (root2, root1) in memo_table:
             return memo_table[(root2, root1)]
         elif root1.is_terminal() or root2.is_terminal():
             return root1 is root2
         else:
-            are_isomorphic = self.__are_nodes_equal(root1, root2) and self.__are_subtrees_isomorphic(
+            are_isomorphic = self.__are_subtrees_isomorphic(
                 root1.true_branch_node, root2.true_branch_node, memo_table) and self.__are_subtrees_isomorphic(
                 root1.false_branch_node, root2.false_branch_node, memo_table)
             memo_table[(root1, root2)] = are_isomorphic
@@ -510,35 +538,41 @@ class Quast:
     def __update_subDAG(self, old_to_new_nodes_dict, curr_node):
         if curr_node not in old_to_new_nodes_dict:
             return curr_node
-        else:
-            if old_to_new_nodes_dict[curr_node] is None:
-                new_true_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
-                                                            curr_node.true_branch_node)
-                new_false_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
-                                                             curr_node.false_branch_node)
-                new_curr_node = Node(curr_node.bset, false_branch_node=new_false_branch_node,
-                                     true_branch_node=new_true_branch_node)
-                old_to_new_nodes_dict[curr_node] = new_curr_node
-            if curr_node is self.root_node:
-                self.root_node = old_to_new_nodes_dict[curr_node]
+        elif old_to_new_nodes_dict[curr_node] is not None:
             return old_to_new_nodes_dict[curr_node]
+        else:
+            new_true_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
+                                                        curr_node.true_branch_node)
+            new_false_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
+                                                         curr_node.false_branch_node)
+            new_curr_node = Node(curr_node.bset, false_branch_node=new_false_branch_node,
+                                 true_branch_node=new_true_branch_node)
+            old_to_new_nodes_dict[curr_node] = new_curr_node
+            if curr_node is self.root_node:
+                self.root_node = new_curr_node
+            return new_curr_node
 
-    def __add_reachable_subDAG_into_dict(self, target, curr_node, reachable_dict):
-        if curr_node is target:
+    def __add_reachable_subDAG_into_dict(self, target, curr_node, reachable_dict, visited):
+        if curr_node in visited:
+            return visited[curr_node]
+        elif curr_node is target:
             return True
         elif curr_node.is_terminal():
             return False
         else:
             is_true_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.true_branch_node,
-                                                                      reachable_dict)
+                                                                      reachable_dict, visited)
             is_false_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.false_branch_node,
-                                                                       reachable_dict)
+                                                                       reachable_dict, visited)
             if is_true_reachable or is_false_reachable:
                 reachable_dict[curr_node] = None
+            visited[curr_node] = is_true_reachable or is_false_reachable
+            return is_true_reachable or is_false_reachable
 
     def __get_reachable_subDAG_as_dict(self, target):
         reachable_dict = {}
-        self.__add_reachable_subDAG_into_dict(target=target, curr_node=self.root_node, reachable_dict=reachable_dict)
+        visited = {}
+        self.__add_reachable_subDAG_into_dict(target=target, curr_node=self.root_node, reachable_dict=reachable_dict, visited=visited)
         return reachable_dict
 
     def __prune_equal_children_node(self, curr_node):
@@ -562,7 +596,7 @@ class Quast:
             return reachable_dict
 
     def __are_nodes_equal(self, node1, node2):
-        return node1.bset == node2.bset
+        return node1.node_type == node2.node_type and node1.bset == node2.bset
 
     # Description: returns a set of all nodes in the current quast
     # Return: Python.set of Nodes
@@ -570,12 +604,16 @@ class Quast:
         if node_set is None:
             node_set = set()
             curr_node = self.root_node
-        if curr_node.is_terminal():
+        if curr_node in node_set:
+            return
+        elif curr_node.is_terminal():
+            node_set.add(curr_node)
+        else:
+            node_set.add(curr_node)
+            self.__get_node_set(node_set=node_set, curr_node=curr_node.true_branch_node)
+            self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
+        if curr_node is self.root_node:
             return node_set
-        node_set.add(curr_node)
-        node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.true_branch_node)
-        node_set = self.__get_node_set(node_set=node_set, curr_node=curr_node.false_branch_node)
-        return node_set
 
 
 class BasicQuast(Quast):
