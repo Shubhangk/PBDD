@@ -87,11 +87,39 @@ class Quast:
         return intersection_quast
 
     def reconstruct_set(self):
-        basic_set_list = self.__reconstruct_set(self.root_node, [])
-        final_set = basic_set_list[0] if len(basic_set_list) > 0 else isl.BasicSet.empty(self.get_space())
-        for basic_set in basic_set_list:
-            final_set = final_set.union(basic_set)
-        return final_set
+        memo = {}
+        return self.__reconstruct_set(self.root_node, memo)
+
+    def __reconstruct_set(self, curr_node, memo):
+        # quast is a single node
+        if curr_node is self.in_node:
+            return isl.BasicSet.universe(self.get_space())
+        elif curr_node is self.out_node:
+            return isl.BasicSet.empty(self.get_space())
+        # current node has already been memoized
+        elif curr_node in memo:
+            return memo[curr_node]
+        # else compute memoization and memoize
+        else:
+            # true_branch_set = None
+            # false_branch_set = None
+            if curr_node.true_branch_node is self.in_node:
+                true_branch_set = curr_node.bset
+            elif curr_node.true_branch_node is self.out_node:
+                true_branch_set = isl.BasicSet.empty(self.get_space())
+            else:
+                true_branch_set = curr_node.bset.intersect(self.__reconstruct_set(curr_node.true_branch_node, memo))
+
+            if curr_node.false_branch_node is self.in_node:
+                false_branch_set = self.__negate_bset(curr_node.bset)
+            elif curr_node.false_branch_node is self.out_node:
+                false_branch_set = isl.BasicSet.empty(self.get_space())
+            else:
+                false_branch_set = self.__negate_bset(curr_node.bset).intersect(self.__reconstruct_set(curr_node.false_branch_node, memo))
+
+            curr_node_set = true_branch_set.union(false_branch_set)
+            memo[curr_node] = curr_node_set
+            return curr_node_set
 
     def complement(self):
         complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
@@ -261,28 +289,6 @@ class Quast:
         memo[curr_node] = new_node
         return new_node
 
-    def __reconstruct_set(self, curr_node, root_to_node_bsets):
-        if curr_node is self.out_node:
-            return []
-        elif curr_node is self.in_node:
-            bset = isl.BasicSet.universe(self.get_space())
-            for constraint_bset in root_to_node_bsets:
-                bset = bset.intersect(constraint_bset)
-            if bset.is_empty():
-                return []
-            else:
-                return [bset]
-        elif curr_node.true_branch_node is curr_node.false_branch_node:
-            return self.__reconstruct_set(curr_node.true_branch_node, root_to_node_bsets)
-        else:
-            root_to_node_bsets.append(curr_node.bset)
-            bsets_from_true = self.__reconstruct_set(curr_node.true_branch_node, root_to_node_bsets)
-            root_to_node_bsets.pop()
-            root_to_node_bsets.append(self.__negate_bset(curr_node.bset))
-            bsets_from_false = self.__reconstruct_set(curr_node.false_branch_node, root_to_node_bsets)
-            root_to_node_bsets.pop()
-            return bsets_from_true + bsets_from_false
-
     def __negate_bset(self, bset):
         return bset.complement()
 
@@ -389,7 +395,7 @@ class Quast:
         return self.__prune_equal_children_node(self.root_node)
 
     def prune_isomorphic_subtrees(self):
-        MAX_MODIFICATIONS = 10
+        MAX_MODIFICATIONS = 15
         num_modifications = 0
         modified = True
         while modified and num_modifications < MAX_MODIFICATIONS:
@@ -414,7 +420,7 @@ class Quast:
         return False
 
     def simplify(self):
-        self.prune_redundant_branches()
+        #self.prune_redundant_branches()
         self.prune_emptyset_branches()
         self.prune_isomorphic_subtrees()
         #self.prune_equal_children_node()
