@@ -18,13 +18,26 @@ class Quast:
 
         # initialize when isl.Set is provided
         if set_ is not None:
-            T = None
-            for basic_set in set_.get_basic_sets():
-                bquast = BasicQuast(basic_set)
-                if T is None:
-                    T = bquast
-                else:
-                    T = bquast.union(T)
+            # T = None
+            # for basic_set in set_.get_basic_sets():
+            #     bquast = BasicQuast(basic_set)
+            #     if T is None:
+            #         T = bquast
+            #     else:
+            #         T = bquast.union(T)
+            quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
+            new_quast_list = []
+            offset = len(quast_list) % 2
+            while len(quast_list) > 1:
+                for i in range(0, len(quast_list) - offset, 2):
+                    new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
+                    new_quast_list[-1].simplify()
+                if offset == 1:
+                    new_quast_list.append(quast_list[-1])
+                offset = len(quast_list) % 2
+                quast_list = new_quast_list
+                new_quast_list = []
+            T = quast_list[0]
             self.update_num_nodes(T.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
