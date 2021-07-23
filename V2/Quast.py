@@ -546,16 +546,16 @@ class Quast:
             root_to_node_path.append([curr_node, True])
             is_true_branch_modified, true_branch_set = self.__detect_and_prune_emptyset_branch_(curr_node.true_branch_node,
                                                                     true_root_to_node_path_bset, root_to_node_path, memo)
-            # if is_true_branch_modified:
-            #     return is_true_branch_modified, true_branch_set
+            if is_true_branch_modified:
+                return is_true_branch_modified, true_branch_set
             curr_node = root_to_node_path.pop()[0]
 
             false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
             root_to_node_path.append([curr_node, False])
             is_false_branch_modified, false_branch_set = self.__detect_and_prune_emptyset_branch_(curr_node.false_branch_node,
                                                                       false_root_to_node_path_bset, root_to_node_path, memo)
-            # if is_false_branch_modified:
-            #     return is_false_branch_modified, false_branch_set
+            if is_false_branch_modified:
+                return is_false_branch_modified, false_branch_set
             curr_node = root_to_node_path.pop()[0]
 
             subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
