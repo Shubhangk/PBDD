@@ -1,3 +1,4 @@
+import os
 import islpy as isl
 from graphviz import Digraph
 from V2.Node import *
@@ -13,31 +14,92 @@ class Quast:
         num_nodes:  Number of nodes in the Quast
     """
 
+    def construct_quast(self, quast_list):
+        new_quast_list = []
+        offset = len(quast_list) % 2
+        while len(quast_list) > 1:
+            for i in range(0, len(quast_list) - offset, 2):
+                new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
+                new_quast_list[-1].simplify()
+            if offset == 1:
+                new_quast_list.append(quast_list[-1])
+            offset = len(quast_list) % 2
+            quast_list = new_quast_list
+            new_quast_list = []
+        return quast_list[0]
+
+
+    def parallel_init(self, set_):
+        quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
+        num_processors = os.cpu_count()
+        if num_processors > 1:
+            num_quasts_per_process = len(quast_list) // (num_processors - 1)
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                results = []
+                for i in range(num_processors - 1):
+                    results.append(executor.submit(self.construct_quast, quast_list[i*num_quasts_per_process: (i+1)*num_quasts_per_process]))
+                quast_list = quast_list[(num_processors - 1) * num_quasts_per_process:]
+                for quast in concurrent.futures.as_completed(results):
+                    quast_list.append(quast.result())
+        T = None
+        for quast in quast_list:
+            T = quast if T is None else quast.union(T)
+        return T
+
     def __init__(self, set_=None, space=None, in_node=None, out_node=None):
         self.num_nodes = 0
 
         # initialize when isl.Set is provided
         if set_ is not None:
-            # T = None
-            # for basic_set in set_.get_basic_sets():
-            #     bquast = BasicQuast(basic_set)
-            #     if T is None:
-            #         T = bquast
-            #     else:
-            #         T = bquast.union(T)
-            quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
-            new_quast_list = []
-            offset = len(quast_list) % 2
-            while len(quast_list) > 1:
-                for i in range(0, len(quast_list) - offset, 2):
-                    new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
-                    new_quast_list[-1].simplify()
-                if offset == 1:
-                    new_quast_list.append(quast_list[-1])
-                offset = len(quast_list) % 2
-                quast_list = new_quast_list
-                new_quast_list = []
-            T = quast_list[0]
+
+            # T = self.parallel_init(set_)
+
+            # normal quast construction. This is much faster than below, but does not simplify the final quast.
+            T = None
+            for basic_set in set_.get_basic_sets():
+                bquast = BasicQuast(basic_set)
+                if T is None:
+                    T = bquast
+                else:
+                    T = bquast.union(T)
+                    #T.prune_emptyset_branches()
+
+            # # merge-sort-like round-based initialization with quast simplification. This is a slower quast construction,
+            # # but simplifies the final quast heavily
+            # quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
+            # new_quast_list = []
+            # offset = len(quast_list) % 2
+            # while len(quast_list) > 1:
+            #     for i in range(0, len(quast_list) - offset, 2):
+            #         new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
+            #         new_quast_list[-1].simplify()
+            #     if offset == 1:
+            #         new_quast_list.append(quast_list[-1])
+            #     offset = len(quast_list) % 2
+            #     quast_list = new_quast_list
+            #     new_quast_list = []
+            # T = quast_list[0]
+
+            # # Hybrid construction approach
+            # quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
+            # new_quast_list = []
+            # offset = len(quast_list) % 2
+            # rounds = 0
+            # while len(quast_list) > 1 and rounds < 4:
+            #     for i in range(0, len(quast_list) - offset, 2):
+            #         new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
+            #         new_quast_list[-1].simplify()
+            #     if offset == 1:
+            #         new_quast_list.append(quast_list[-1])
+            #     offset = len(quast_list) % 2
+            #     quast_list = new_quast_list
+            #     new_quast_list = []
+            #     rounds = rounds + 1
+            # T = quast_list[0]
+            # if len(quast_list) != 1:
+            #     for quast in quast_list:
+            #         T = quast.union(T)
+
             self.update_num_nodes(T.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
@@ -68,6 +130,9 @@ class Quast:
     def set_tree_size(self, tree_size):
         self.num_nodes = tree_size
 
+    def compute_tree_size(self):
+        return len(self.__get_node_set())
+
     def increment_tree_size(self):
         self.num_nodes = self.num_nodes + 1
 
@@ -91,8 +156,8 @@ class Quast:
         return union_quast
 
     def intersect(self, quast):
-        if self.get_space() != quast.get_space():
-            raise Exception("spaces don't match")
+        # if self.get_space() != quast.get_space():
+        #     raise Exception("spaces don't match")
         intersection_quast = Quast(space=self.get_space(), in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
@@ -139,7 +204,7 @@ class Quast:
         complement_quast.root_node = self.root_node
         return complement_quast
 
-    def visualize_tree(self):
+    def visualize_tree(self, output_filename='quast'):
         dot = Digraph(format="pdf", comment='Quast Visualization')
         arcs = set()
         self.__visualize_tree(arcs, self.root_node)
@@ -152,11 +217,13 @@ class Quast:
             dot.edge(str(id(arc[0])), str(id(arc[1])), label=arc[2])
         if arcs == set():
             dot.node('root', self.root_node.bset)
-        print(dot.source)
-        dot.render('visualization-output/quast', view=True)
+        #print(dot.source)
+        dot.render('visualization-output/'+output_filename, view=True)
 
     def is_empty(self):
-        return self.__is_empty(self.root_node, isl.BasicSet.universe(self.get_space()))
+        memo = {self.in_node: isl.BasicSet.universe(self.get_space()), self.out_node: isl.BasicSet.empty(self.get_space())}
+        is_empty, set_ = self.__is_empty(self.root_node, isl.BasicSet.universe(self.get_space()), memo)
+        return is_empty
 
     def is_subset(self, quast):
         return self.intersect(quast.complement()).is_empty()
@@ -199,25 +266,31 @@ class Quast:
         self.__project_out(T, T.root_node, project_out_quast, root_to_node_path, dim_type, first, n)
         return project_out_quast
 
+    def subtract(self, quast):
+        return self.intersect(quast.complement())
+
     ########################################################################
     # Internal implementation of set operations in quast representation
     ########################################################################
 
-    def __is_empty(self, curr_node, root_to_node_path_bset):
-        if curr_node is self.in_node:
-            return root_to_node_path_bset.is_empty()
-        elif curr_node is self.out_node:
-            return True
-        elif root_to_node_path_bset.plain_is_empty():
-            return True
+    def __is_empty(self, curr_node, root_to_node_path_bset, memo):
+        if curr_node in memo:
+            curr_path_set = root_to_node_path_bset.intersect(memo[curr_node])
+            return curr_path_set.is_empty(), memo[curr_node]
+        elif root_to_node_path_bset.is_empty():
+            return True, isl.BasicSet.universe(self.get_space())
         else:
             true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
-            is_true_branch_empty = self.__is_empty(curr_node.true_branch_node, true_root_to_node_path_bset)
+            is_true_branch_empty, true_branch_set = self.__is_empty(curr_node.true_branch_node, true_root_to_node_path_bset, memo)
             if not is_true_branch_empty:
-                return False
+                return False, true_branch_set
             false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
-            is_false_branch_empty = self.__is_empty(curr_node.false_branch_node, false_root_to_node_path_bset)
-            return is_false_branch_empty
+            is_false_branch_empty, false_branch_set = self.__is_empty(curr_node.false_branch_node, false_root_to_node_path_bset, memo)
+            if not is_false_branch_empty:
+                return False, false_branch_set
+            subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
+            memo[curr_node] = subtree_set
+            return True, subtree_set
 
     def __project_out(self, tree_expansion, curr_node, project_out_quast, root_to_node_path, dim_type, first, n):
         if curr_node is tree_expansion.in_node:
@@ -397,18 +470,20 @@ class Quast:
         self.__prune_redundant_branches(self.root_node, [])
 
     def prune_emptyset_branches(self):
-        MAX_MODIFICATIONS = 10
+        MAX_MODIFICATIONS = 9
         num_modifications = 0
         modified = True
         while modified and num_modifications < MAX_MODIFICATIONS:
-            modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
+            memo = {}
+            modified = self.__detect_and_prune_emptyset_branch_(self.root_node, isl.Set.universe(self.get_space()), [], memo)
+            #modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
             num_modifications = num_modifications + 1
 
     def prune_equal_children_node(self):
         return self.__prune_equal_children_node(self.root_node)
 
     def prune_isomorphic_subtrees(self):
-        MAX_MODIFICATIONS = 15
+        MAX_MODIFICATIONS = 10
         num_modifications = 0
         modified = True
         while modified and num_modifications < MAX_MODIFICATIONS:
@@ -447,6 +522,45 @@ class Quast:
         for constraint in constraint_list:
             basic_set = basic_set.intersect(constraint)
         return basic_set.is_subset(bset)
+
+    def __detect_and_prune_emptyset_branch_(self, curr_node, root_to_node_path_bset, root_to_node_path, memo):
+        if root_to_node_path_bset.is_empty():
+            self.__prune_branch_(root_to_node_path)
+            return True, isl.BasicSet.universe(self.get_space())
+        elif curr_node.is_terminal():
+            return False, isl.BasicSet.universe(self.get_space())
+        elif curr_node is not self.root_node and root_to_node_path_bset.is_subset(curr_node.bset):
+            root_to_node_path.append([curr_node, False])
+            self.__prune_branch_(root_to_node_path)
+            node = root_to_node_path.pop()[0]
+            return True, isl.BasicSet.universe(self.get_space())
+        elif curr_node in memo:
+            curr_path_set = root_to_node_path_bset.intersect(memo[curr_node])
+            if curr_path_set.is_empty():
+                self.__prune_branch_(root_to_node_path)
+                return True, isl.BasicSet.universe(self.get_space())
+            else:
+                return False, curr_path_set
+        else:
+            true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
+            root_to_node_path.append([curr_node, True])
+            is_true_branch_modified, true_branch_set = self.__detect_and_prune_emptyset_branch_(curr_node.true_branch_node,
+                                                                    true_root_to_node_path_bset, root_to_node_path, memo)
+            # if is_true_branch_modified:
+            #     return is_true_branch_modified, true_branch_set
+            curr_node = root_to_node_path.pop()[0]
+
+            false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
+            root_to_node_path.append([curr_node, False])
+            is_false_branch_modified, false_branch_set = self.__detect_and_prune_emptyset_branch_(curr_node.false_branch_node,
+                                                                      false_root_to_node_path_bset, root_to_node_path, memo)
+            # if is_false_branch_modified:
+            #     return is_false_branch_modified, false_branch_set
+            curr_node = root_to_node_path.pop()[0]
+
+            subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
+            memo[curr_node] = subtree_set
+            return False, subtree_set
 
     def __detect_and_prune_emptyset_branch(self, node, root_to_node_path, constraint_list):
         if node.is_terminal():
@@ -499,6 +613,20 @@ class Quast:
         root_to_node_path.append([node, False])
         self.__prune_redundant_branches(node.false_branch_node, root_to_node_path)
         node = root_to_node_path.pop()[0]
+
+    def __prune_branch_(self, root_to_node_path):
+        node_to_skip, branch_to_skip = root_to_node_path[len(root_to_node_path) - 1][0], root_to_node_path[len(root_to_node_path) - 1][1]
+        next_node = node_to_skip.false_branch_node if branch_to_skip is True else node_to_skip.true_branch_node
+        for i in range(len(root_to_node_path)-2, -1, -1):
+            curr_node, curr_branch = root_to_node_path[i][0], root_to_node_path[i][1]
+            new_true_branch_node = next_node if curr_branch is True else curr_node.true_branch_node
+            new_false_branch_node = next_node if curr_branch is False else curr_node.false_branch_node
+            next_node = Node(bset=curr_node.bset, false_branch_node=new_false_branch_node,
+                            true_branch_node=new_true_branch_node)
+            if i == 0:
+                self.root_node = next_node
+            root_to_node_path[i] = [next_node, curr_branch]
+
 
     def __prune_branch(self, root_to_node_path, i=0):
         node, branch = root_to_node_path[i][0], root_to_node_path[i][1]
@@ -629,7 +757,7 @@ class BasicQuast(Quast):
         # construct tree from bset
         if bset is not None:
             next_true_branch_node = self.in_node
-            constraints_as_bsets = [isl.BasicSet.from_constraint(constraint) for constraint in bset.get_constraints()]
+            constraints_as_bsets = [isl.Set.from_basic_set(isl.BasicSet.from_constraint(constraint)) for constraint in bset.get_constraints()]
             for bset_constraint in constraints_as_bsets:
                 node = Node(bset=bset_constraint, false_branch_node=self.out_node, true_branch_node=next_true_branch_node)
                 next_true_branch_node = node
