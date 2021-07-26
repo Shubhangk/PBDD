@@ -1,0 +1,116 @@
+/Library/Frameworks/Python.framework/Versions/3.6/bin/python3.6 /Users/shubhangkulkarni/PycharmProjects/ANLSummer21/V2/Experiments/quast-p7/quast-p7.py
+entering get_set()
+constructing set: set_1234
+Elapsed time: 0.0729 seconds
+exiting get_set()
+--------------------------
+entering get_set()
+constructing set: set_1233
+Elapsed time: 0.0776 seconds
+exiting get_set()
+--------------------------
+entering get_quast()
+constructing quast for set: quast_1234
+Elapsed time: 0.0150 seconds
+exiting get_quast()
+--------------------------
+entering get_quast()
+constructing quast for set: quast_1233
+Elapsed time: 0.0142 seconds
+exiting get_quast()
+--------------------------
+entering intersect_sets()
+Intersecting sets: set_1234, set_1233
+Elapsed time: 0.0923 seconds
+exiting intersect_sets()
+--------------------------
+entering intersect_quasts()
+Intersecting quasts: quast_1234, quast_1233
+Elapsed time: 0.0017 seconds
+exiting intersect_quasts()
+--------------------------
+entering get_set()
+constructing set: set_1240
+Elapsed time: 0.0821 seconds
+exiting get_set()
+--------------------------
+entering get_set()
+constructing set: set_1617
+Elapsed time: 0.3323 seconds
+exiting get_set()
+--------------------------
+entering get_quast()
+constructing quast for set: quast_1240
+Elapsed time: 0.0161 seconds
+exiting get_quast()
+--------------------------
+entering get_quast()
+constructing quast for set: quast_1617
+Elapsed time: 0.0573 seconds
+exiting get_quast()
+--------------------------
+entering is_subset_sets()
+Is subset sets: set_1240, set_1617
+Elapsed time: 0.0023 seconds
+exiting is_subset_sets()
+--------------------------
+entering is_subset_quasts()
+is subset quasts: quast_1240, quast_1617
+Elapsed time: 0.1482 seconds
+exiting is_subset_quasts()
+--------------------------
+True
+entering get_set()
+constructing set: set_2040
+Elapsed time: 0.0031 seconds
+exiting get_set()
+--------------------------
+entering get_set()
+constructing set: set_2039
+Elapsed time: 0.1706 seconds
+exiting get_set()
+--------------------------
+entering get_quast()
+constructing quast for set: set_2040
+Elapsed time: 0.0004 seconds
+exiting get_quast()
+--------------------------
+entering get_quast()
+constructing quast for set: set_2039
+Elapsed time: 0.0254 seconds
+exiting get_quast()
+--------------------------
+entering subtract_sets()
+Subtracting sets: set_2040, set_2039
+Elapsed time: 17.6405 seconds
+exiting subtract_sets()
+--------------------------
+entering subtract_quasts()
+Subtracting quasts: quast_2040, quast_2039
+Elapsed time: 0.0001 seconds
+exiting subtract_quasts()
+--------------------------
+entering get_set()
+constructing set: set_2056
+Elapsed time: 0.0511 seconds
+exiting get_set()
+--------------------------
+entering get_quast()
+constructing quast for set: quast_2056
+Elapsed time: 0.0089 seconds
+exiting get_quast()
+--------------------------
+entering subtract_sets()
+Subtracting sets: set_2057, set_2056
+Elapsed time: 13.1726 seconds
+exiting subtract_sets()
+--------------------------
+entering subtract_quasts()
+Subtracting quasts: quast_2057, quast_2056
+Elapsed time: 0.0018 seconds
+exiting subtract_quasts()
+--------------------------
+Exiting main()
+--------------------------
+
+Process finished with exit code 0
