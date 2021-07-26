@@ -482,40 +482,7 @@ class Quast:
     # Internal implementation of quast optimization functions
     ########################################################################
 
-    def prune_redundant_nodes(self):
-        pruned_constraints = set()
-        curr_node = self.root_node
-        visited = set()
-        self.__prune_redundant_nodes_(self.root_node, pruned_constraints, visited)
 
-    def __prune_redundant_nodes_(self, curr_node, pruned_constraints, visited):
-        if curr_node.is_terminal() or curr_node in visited:
-            return
-        visited.add(curr_node)
-        if curr_node.bset not in pruned_constraints:
-            self.__A(self.root_node, set(), set(), [], curr_node.bset, curr_node)
-            pruned_constraints.add(curr_node.bset)
-        self.__prune_redundant_nodes_(curr_node.false_branch_node, pruned_constraints, visited)
-        self.__prune_redundant_nodes_(curr_node.true_branch_node, pruned_constraints, visited)
-
-
-    def __A(self, curr_node, memo, visited, root_to_node_path, target_constraint, target_node):
-        if curr_node.is_terminal() or curr_node in visited:
-            return
-        elif curr_node is not target_node and target_constraint.is_subset(curr_node.bset):
-            self.__prune_branch_(root_to_node_path, curr_node.true_branch_node)
-            self.__A(curr_node.true_branch_node, memo, visited, root_to_node_path, target_constraint, target_node)
-        elif curr_node is not target_node and target_constraint.is_subset(self.__negate_bset(curr_node.bset)):
-            self.__prune_branch_(root_to_node_path, curr_node.false_branch_node)
-            self.__A(curr_node.false_branch_node, memo, visited, root_to_node_path, target_constraint, target_node)
-        else:
-            visited.add(curr_node)
-            root_to_node_path.append([curr_node, False])
-            self.__A(curr_node.false_branch_node, memo, visited, root_to_node_path, target_constraint, target_node)
-            root_to_node_path.pop()
-            root_to_node_path.append([curr_node, True])
-            self.__A(curr_node.true_branch_node, memo, visited, root_to_node_path, target_constraint, target_node)
-            root_to_node_path.pop()
 
 
     def __is_constraint_valid(self, bset, constraint_list):
