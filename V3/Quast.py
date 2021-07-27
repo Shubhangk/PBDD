@@ -525,40 +525,26 @@ class Quast:
             curr_node = root_to_node_path.pop()[0]
             return False
 
-    def set_is_empty(self, set_):
-        return set_.is_empty()
-
-    def set_is_subset(self, set1, set2):
-        return set1.is_subset(set2)
-
-    def set_intersect(self, set1, set2):
-        return set1.intersect(set2)
-
-    def set_union(self, set1, set2):
-        return set1.union(set2)
-
     def __detect_and_prune_emptyset_branch(self, curr_node, root_to_node_path_bset, root_to_node_path, memo):
-        #if root_to_node_path_bset.is_empty():
-        if self.set_is_empty(root_to_node_path_bset):
+        if root_to_node_path_bset.is_empty():
             self.__prune_branch(root_to_node_path)
             return True, isl.BasicSet.universe(self.get_space())
         elif curr_node.is_terminal():
             return False, isl.BasicSet.universe(self.get_space())
-        elif curr_node is not self.root_node and self.set_is_subset(root_to_node_path_bset, curr_node.bset): #root_to_node_path_bset.is_subset(curr_node.bset):
+        elif curr_node is not self.root_node and root_to_node_path_bset.is_subset(curr_node.bset):
             root_to_node_path.append([curr_node, False])
             self.__prune_branch(root_to_node_path)
             node = root_to_node_path.pop()[0]
             return True, isl.BasicSet.universe(self.get_space())
         elif curr_node in memo:
-            curr_path_set = self.set_intersect(root_to_node_path_bset, memo[curr_node]) #root_to_node_path_bset.intersect(memo[curr_node])
-            #if curr_path_set.is_empty():
-            if self.set_is_empty(curr_path_set):
+            curr_path_set = root_to_node_path_bset.intersect(memo[curr_node])
+            if curr_path_set.is_empty():
                 self.__prune_branch(root_to_node_path)
                 return True, isl.BasicSet.universe(self.get_space())
             else:
                 return False, curr_path_set
         else:
-            true_root_to_node_path_bset = self.set_intersect(root_to_node_path_bset, curr_node.bset) #root_to_node_path_bset.intersect(curr_node.bset)
+            true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
             root_to_node_path.append([curr_node, True])
             is_true_branch_modified, true_branch_set = self.__detect_and_prune_emptyset_branch(curr_node.true_branch_node,
                                                                                                true_root_to_node_path_bset, root_to_node_path, memo)
@@ -566,7 +552,7 @@ class Quast:
                 return is_true_branch_modified, true_branch_set
             curr_node = root_to_node_path.pop()[0]
 
-            false_root_to_node_path_bset = self.set_intersect(root_to_node_path_bset, self.__negate_bset(curr_node.bset)) #root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
+            false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
             root_to_node_path.append([curr_node, False])
             is_false_branch_modified, false_branch_set = self.__detect_and_prune_emptyset_branch(curr_node.false_branch_node,
                                                                                                  false_root_to_node_path_bset, root_to_node_path, memo)
@@ -574,8 +560,7 @@ class Quast:
                 return is_false_branch_modified, false_branch_set
             curr_node = root_to_node_path.pop()[0]
 
-            subtree_set = self.set_union(self.set_intersect(self.__negate_bset(curr_node.bset), false_branch_set), self.set_intersect(curr_node.bset, true_branch_set))
-            #subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
+            subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
             memo[curr_node] = subtree_set
             return False, subtree_set
 
@@ -603,6 +588,34 @@ class Quast:
         root_to_node_path.append([node, False])
         self.__prune_redundant_branches(node.false_branch_node, root_to_node_path)
         node = root_to_node_path.pop()[0]
+
+    def new_prune_redundant_branches(self):
+        self.root_node, temp_flag = self.__new_prune_redundant_branches(node=self.root_node, ancestors={})
+
+    # ancestors: maps set to true/false to indicate which branch was taken
+    def __new_prune_redundant_branches(self, node, ancestors):
+        if node.is_terminal():
+            return node, False
+
+        is_first_occurrence = node.bset not in ancestors
+        if is_first_occurrence:
+            ancestors[node.bset] = True
+        new_true_branch_node, is_true_modified = self.__new_prune_redundant_branches(node.true_branch_node, ancestors)
+        if is_first_occurrence:
+            ancestors[node.bset] = False
+        new_false_branch_node, is_false_modified = self.__new_prune_redundant_branches(node.false_branch_node, ancestors)
+        branch = ancestors[node.bset]
+        if is_first_occurrence:
+            del ancestors[node.bset]
+
+        if not is_first_occurrence and node.bset in ancestors:
+            return (new_true_branch_node if branch else new_false_branch_node), True
+        elif not is_first_occurrence and self.__negate_bset(node.bset) in ancestors:
+            return (new_false_branch_node if branch else new_true_branch_node), True
+        elif not is_false_modified and not is_true_modified:
+            return node, False
+        else:
+            return Node(bset=node.bset, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node), True
 
     def __prune_branch(self, root_to_node_path):
         node_to_skip, branch_to_skip = root_to_node_path[len(root_to_node_path) - 1][0], root_to_node_path[len(root_to_node_path) - 1][1]

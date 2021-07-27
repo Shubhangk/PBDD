@@ -80,13 +80,13 @@ def construct_quast():
             for q_i in constraints:
                 quast_to_subtract = q_i.intersect(quast)
                 quast = quast.subtract(quast_to_subtract)
-                #quast.prune_emptyset_branches
-                quast.prune_redundant_branches()
+                #quast.prune_emptyset_branches()
+                quast.new_prune_redundant_branches()
             end = timer()
             time[num_non_equality_constraints] = time[num_non_equality_constraints] + end - start
         time[num_non_equality_constraints] = time[num_non_equality_constraints] / num_experiments
-        if num_non_equality_constraints == 11:
-            quast.visualize_tree()
+
+    quast.visualize_tree()
     return time
 
     # q = [Q.Quast(p_i) for p_i in p]
