@@ -72,7 +72,7 @@ def construct_quast():
 
     num_experiments = 1
     time = [0] * (len(p) + 1)
-    for num_non_equality_constraints in range(10, len(q) + 1):
+    for num_non_equality_constraints in range(1, len(q) + 1):
         constraints = q[0:num_non_equality_constraints]
         for _ in range(num_experiments):
             quast = Q.Quast(isl.Set.universe(space))
@@ -80,8 +80,8 @@ def construct_quast():
             for q_i in constraints:
                 quast_to_subtract = q_i.intersect(quast)
                 quast = quast.subtract(quast_to_subtract)
-                quast.prune_emptyset_branches()
-                #quast.prune_redundant_branches()
+                #quast.prune_emptyset_branches()
+                quast.prune_redundant_branches()
             end = timer()
             time[num_non_equality_constraints] = time[num_non_equality_constraints] + end - start
         time[num_non_equality_constraints] = time[num_non_equality_constraints] / num_experiments

@@ -435,14 +435,7 @@ class Quast:
         self.root_node, _ = self.__prune_redundant_branches(node=self.root_node, ancestors={})
 
     def prune_emptyset_branches(self):
-        MAX_MODIFICATIONS = 11
-        num_modifications = 0
-        modified = True
-        while modified and num_modifications < MAX_MODIFICATIONS:
-            memo = {}
-            modified = self.__detect_and_prune_emptyset_branch(self.root_node, isl.Set.universe(self.get_space()), [], memo)
-            #modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
-            num_modifications = num_modifications + 1
+        self.root_node, _ = self.__prune_emptyset_branches(self.root_node, isl.Set.universe(self.get_space()))
 
     def prune_equal_children_nodes(self):
         self.root_node, _ = self.__prune_equal_children_nodes(node=self.root_node, new_nodes_map={})
@@ -454,23 +447,6 @@ class Quast:
         while modified and num_modifications < MAX_MODIFICATIONS:
             modified = self.__detect_and_prune_isomorphic_subtrees()
             num_modifications = num_modifications + 1
-
-    def __detect_and_prune_isomorphic_subtrees(self):
-        node_set = self.__get_node_set()
-        memo_table = {}
-        for node1 in node_set:
-            for node2 in node_set:
-                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2, memo_table):
-                    can_reach_node1 = self.__get_reachable_subDAG_as_dict(node1)
-                    if node2 in can_reach_node1:
-                        can_reach_node2 = self.__get_reachable_subDAG_as_dict(node2)
-                        can_reach_node2[node2] = node1
-                        self.__update_subDAG(can_reach_node2, self.root_node)
-                    else:
-                        can_reach_node1[node1] = node2
-                        self.__update_subDAG(can_reach_node1, self.root_node)
-                    return True
-        return False
 
     def simplify(self):
         #self.prune_redundant_branches()
@@ -509,10 +485,7 @@ class Quast:
             return Node(bset=node.bset, false_branch_node=new_false_branch_node,
                         true_branch_node=new_true_branch_node), True
 
-    def new_prune_emptyset_branches(self):
-        self.root_node, _ = self.__new_prune_emptyset_branches(self.root_node, isl.Set.universe(self.get_space()))
-
-    def __new_prune_emptyset_branches(self, node, root_to_node_set):
+    def __prune_emptyset_branches(self, node, root_to_node_set):
         if node.is_terminal():
             return node, False
 
@@ -520,141 +493,22 @@ class Quast:
         root_to_false_node_set = root_to_node_set.intersect(self.__negate_bset(node.bset))
 
         if root_to_true_node_set.is_empty():
-            new_false_branch_node, is_false_modified = self.__new_prune_emptyset_branches(node.false_branch_node,
-                                                                                          root_to_false_node_set)
+            new_false_branch_node, is_false_modified = self.__prune_emptyset_branches(node.false_branch_node,
+                                                                                      root_to_false_node_set)
             return new_false_branch_node, True
         elif root_to_false_node_set.is_empty():
-            new_true_branch_node, is_true_modified = self.__new_prune_emptyset_branches(node.true_branch_node,
-                                                                                        root_to_true_node_set)
+            new_true_branch_node, is_true_modified = self.__prune_emptyset_branches(node.true_branch_node,
+                                                                                    root_to_true_node_set)
             return new_true_branch_node, True
         else:
-            new_false_branch_node, is_false_modified = self.__new_prune_emptyset_branches(node.false_branch_node,
-                                                                                          root_to_false_node_set)
-            new_true_branch_node, is_true_modified = self.__new_prune_emptyset_branches(node.true_branch_node,
-                                                                                        root_to_true_node_set)
+            new_false_branch_node, is_false_modified = self.__prune_emptyset_branches(node.false_branch_node,
+                                                                                      root_to_false_node_set)
+            new_true_branch_node, is_true_modified = self.__prune_emptyset_branches(node.true_branch_node,
+                                                                                    root_to_true_node_set)
             if is_false_modified or is_true_modified:
                 return Node(bset=node.bset, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node), True
             else:
                 return node, False
-
-    def __is_constraint_valid(self, bset, constraint_list):
-        basic_set = isl.BasicSet.universe(self.get_space())
-        for constraint in constraint_list:
-            basic_set = basic_set.intersect(constraint)
-        return basic_set.is_subset(bset)
-
-    def __detect_and_prune_emptyset_branch_(self, curr_node, root_to_node_path_bset, root_to_node_path):
-        if curr_node.is_terminal():
-           return False
-        #elif curr_node is not self.root_node and root_to_node_path_bset.is_subset(curr_node.bset):
-        else:
-            true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
-            if true_root_to_node_path_bset.is_empty():
-                # The true branch of curr_node is empty. Prune true branch, keep false branch.
-                node_to_keep = curr_node.false_branch_node
-                self.__prune_branch_(root_to_node_path, node_to_keep)
-                return True
-
-            root_to_node_path.append([curr_node, True])
-            is_true_branch_modified = self.__detect_and_prune_emptyset_branch_(curr_node.true_branch_node,true_root_to_node_path_bset, root_to_node_path)
-            while is_true_branch_modified:
-                is_true_branch_modified = self.__detect_and_prune_emptyset_branch_(curr_node.true_branch_node, true_root_to_node_path_bset, root_to_node_path)
-
-            curr_node = root_to_node_path.pop()[0]
-
-            false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
-            if false_root_to_node_path_bset.is_empty():
-                # The false branch of curr_node is empty. Prune false branch, keep true branch.
-                node_to_keep = curr_node.true_branch_node
-                self.__prune_branch_(root_to_node_path, node_to_keep)
-                return True
-
-            root_to_node_path.append([curr_node, False])
-            is_false_branch_modified = self.__detect_and_prune_emptyset_branch_(curr_node.false_branch_node, false_root_to_node_path_bset, root_to_node_path)
-            while is_false_branch_modified:
-                is_false_branch_modified = self.__detect_and_prune_emptyset_branch_(curr_node.false_branch_node, false_root_to_node_path_bset, root_to_node_path)
-
-            curr_node = root_to_node_path.pop()[0]
-            return False
-
-    def __detect_and_prune_emptyset_branch(self, curr_node, root_to_node_path_bset, root_to_node_path, memo):
-        if root_to_node_path_bset.is_empty():
-            self.__prune_branch(root_to_node_path)
-            return True, isl.BasicSet.universe(self.get_space())
-        elif curr_node.is_terminal():
-            return False, isl.BasicSet.universe(self.get_space())
-        elif curr_node is not self.root_node and root_to_node_path_bset.is_subset(curr_node.bset):
-            root_to_node_path.append([curr_node, False])
-            self.__prune_branch(root_to_node_path)
-            node = root_to_node_path.pop()[0]
-            return True, isl.BasicSet.universe(self.get_space())
-        elif curr_node in memo:
-            curr_path_set = root_to_node_path_bset.intersect(memo[curr_node])
-            if curr_path_set.is_empty():
-                self.__prune_branch(root_to_node_path)
-                return True, isl.BasicSet.universe(self.get_space())
-            else:
-                return False, curr_path_set
-        else:
-            true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
-            root_to_node_path.append([curr_node, True])
-            is_true_branch_modified, true_branch_set = self.__detect_and_prune_emptyset_branch(curr_node.true_branch_node,
-                                                                                               true_root_to_node_path_bset, root_to_node_path, memo)
-            if is_true_branch_modified:
-                return is_true_branch_modified, true_branch_set
-            curr_node = root_to_node_path.pop()[0]
-
-            false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
-            root_to_node_path.append([curr_node, False])
-            is_false_branch_modified, false_branch_set = self.__detect_and_prune_emptyset_branch(curr_node.false_branch_node,
-                                                                                                 false_root_to_node_path_bset, root_to_node_path, memo)
-            if is_false_branch_modified:
-                return is_false_branch_modified, false_branch_set
-            curr_node = root_to_node_path.pop()[0]
-
-            subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
-            memo[curr_node] = subtree_set
-            return False, subtree_set
-
-    def __prune_branch(self, root_to_node_path):
-        node_to_skip, branch_to_skip = root_to_node_path[len(root_to_node_path) - 1][0], root_to_node_path[len(root_to_node_path) - 1][1]
-        next_node = node_to_skip.false_branch_node if branch_to_skip is True else node_to_skip.true_branch_node
-        for i in range(len(root_to_node_path)-2, -1, -1):
-            curr_node, curr_branch = root_to_node_path[i][0], root_to_node_path[i][1]
-            new_true_branch_node = next_node if curr_branch is True else curr_node.true_branch_node
-            new_false_branch_node = next_node if curr_branch is False else curr_node.false_branch_node
-            next_node = Node(bset=curr_node.bset, false_branch_node=new_false_branch_node,
-                            true_branch_node=new_true_branch_node)
-            if i == 0:
-                self.root_node = next_node
-            root_to_node_path[i] = [next_node, curr_branch]
-
-    def __prune_branch_(self, root_to_node_path, node_to_link):
-        next_node = node_to_link
-        for i in range(len(root_to_node_path)-1, -1, -1):
-            node, branch = root_to_node_path[i][0], root_to_node_path[i][1]
-            new_true_branch_node = next_node if branch else node.true_branch_node
-            new_false_branch_node = next_node if not branch else node.false_branch_node
-            next_node = Node(bset=node.bset, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
-            root_to_node_path[i] = [next_node, branch]
-        self.root_node = root_to_node_path[0]
-
-    def __are_subtrees_isomorphic(self, root1, root2, memo_table):
-        if not self.__are_nodes_equal(root1, root2):
-            return False
-        elif (root1, root2) in memo_table:
-            return memo_table[(root1, root2)]
-        elif (root2, root1) in memo_table:
-            return memo_table[(root2, root1)]
-        elif root1.is_terminal() or root2.is_terminal():
-            return root1 is root2
-        else:
-            are_isomorphic = self.__are_subtrees_isomorphic(
-                root1.true_branch_node, root2.true_branch_node, memo_table) and self.__are_subtrees_isomorphic(
-                root1.false_branch_node, root2.false_branch_node, memo_table)
-            memo_table[(root1, root2)] = are_isomorphic
-            memo_table[(root2, root1)] = are_isomorphic
-            return are_isomorphic
 
     def __prune_equal_children_nodes(self, node, new_nodes_map):
         if node.is_terminal():
@@ -676,6 +530,46 @@ class Quast:
             else:
                 new_nodes_map[node] = node
                 return node, False
+
+    def __is_constraint_valid(self, bset, constraint_list):
+        basic_set = isl.BasicSet.universe(self.get_space())
+        for constraint in constraint_list:
+            basic_set = basic_set.intersect(constraint)
+        return basic_set.is_subset(bset)
+
+    def __detect_and_prune_isomorphic_subtrees(self):
+        node_set = self.__get_node_set()
+        memo_table = {}
+        for node1 in node_set:
+            for node2 in node_set:
+                if node1 is not node2 and self.__are_subtrees_isomorphic(node1, node2, memo_table):
+                    can_reach_node1 = self.__get_reachable_subDAG_as_dict(node1)
+                    if node2 in can_reach_node1:
+                        can_reach_node2 = self.__get_reachable_subDAG_as_dict(node2)
+                        can_reach_node2[node2] = node1
+                        self.__update_subDAG(can_reach_node2, self.root_node)
+                    else:
+                        can_reach_node1[node1] = node2
+                        self.__update_subDAG(can_reach_node1, self.root_node)
+                    return True
+        return False
+
+    def __are_subtrees_isomorphic(self, root1, root2, memo_table):
+        if not self.__are_nodes_equal(root1, root2):
+            return False
+        elif (root1, root2) in memo_table:
+            return memo_table[(root1, root2)]
+        elif (root2, root1) in memo_table:
+            return memo_table[(root2, root1)]
+        elif root1.is_terminal() or root2.is_terminal():
+            return root1 is root2
+        else:
+            are_isomorphic = self.__are_subtrees_isomorphic(
+                root1.true_branch_node, root2.true_branch_node, memo_table) and self.__are_subtrees_isomorphic(
+                root1.false_branch_node, root2.false_branch_node, memo_table)
+            memo_table[(root1, root2)] = are_isomorphic
+            memo_table[(root2, root1)] = are_isomorphic
+            return are_isomorphic
 
     def __are_nodes_equal(self, node1, node2):
         return node1.node_type == node2.node_type and node1.bset == node2.bset
