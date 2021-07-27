@@ -199,7 +199,7 @@ class TestQuast(unittest.TestCase):
         b = Q.Quast(B)
         c = a.intersect(b)
         c.prune_emptyset_branches()
-        c.prune_equal_children_node()
+        c.prune_equal_children_nodes()
         self.assertTrue(c.reconstruct_set().is_empty())
 
     def test_prune_empty_branches_AND_equal_children_node(self):
@@ -212,7 +212,7 @@ class TestQuast(unittest.TestCase):
         d = a.intersect(b)
         e = d.union(c)
         e.prune_emptyset_branches()
-        e.prune_equal_children_node()
+        e.prune_equal_children_nodes()
         self.assertTrue(e.reconstruct_set() == A.intersect(B).union(C))
         # space = A.get_space()
         # self.assertTrue(e.root_node.bset == isl.BasicSet.from_constraint(isl.Constraint.ineq_from_names(space, {1: 0, "y": -1})))

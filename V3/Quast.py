@@ -432,7 +432,7 @@ class Quast:
     ######################################################################
 
     def prune_redundant_branches(self):
-        self.__prune_redundant_branches(self.root_node, [])
+        self.root_node, _ = self.__prune_redundant_branches(node=self.root_node, ancestors={})
 
     def prune_emptyset_branches(self):
         MAX_MODIFICATIONS = 11
@@ -444,8 +444,8 @@ class Quast:
             #modified = self.__detect_and_prune_emptyset_branch(self.root_node, [], [])
             num_modifications = num_modifications + 1
 
-    def prune_equal_children_node(self):
-        return self.__prune_equal_children_node(self.root_node)
+    def prune_equal_children_nodes(self):
+        self.root_node, _ = self.__prune_equal_children_nodes(node=self.root_node, new_nodes_map={})
 
     def prune_isomorphic_subtrees(self):
         MAX_MODIFICATIONS = 10
@@ -482,8 +482,60 @@ class Quast:
     # Internal implementation of quast optimization functions
     ########################################################################
 
+    # ancestors: maps set to true/false to indicate which branch was taken
+    def __prune_redundant_branches(self, node, ancestors):
+        if node.is_terminal():
+            return node, False
 
+        is_first_occurrence = node.bset not in ancestors
+        if is_first_occurrence:
+            ancestors[node.bset] = True
+        new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node, ancestors)
+        if is_first_occurrence:
+            ancestors[node.bset] = False
+        new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node,
+                                                                                   ancestors)
+        branch = ancestors[node.bset]
+        if is_first_occurrence:
+            del ancestors[node.bset]
 
+        if not is_first_occurrence and node.bset in ancestors:
+            return (new_true_branch_node if branch else new_false_branch_node), True
+        elif not is_first_occurrence and self.__negate_bset(node.bset) in ancestors:
+            return (new_false_branch_node if branch else new_true_branch_node), True
+        elif not is_false_modified and not is_true_modified:
+            return node, False
+        else:
+            return Node(bset=node.bset, false_branch_node=new_false_branch_node,
+                        true_branch_node=new_true_branch_node), True
+
+    def new_prune_emptyset_branches(self):
+        self.root_node, _ = self.__new_prune_emptyset_branches(self.root_node, isl.Set.universe(self.get_space()))
+
+    def __new_prune_emptyset_branches(self, node, root_to_node_set):
+        if node.is_terminal():
+            return node, False
+
+        root_to_true_node_set = root_to_node_set.intersect(node.bset)
+        root_to_false_node_set = root_to_node_set.intersect(self.__negate_bset(node.bset))
+
+        if root_to_true_node_set.is_empty():
+            new_false_branch_node, is_false_modified = self.__new_prune_emptyset_branches(node.false_branch_node,
+                                                                                          root_to_false_node_set)
+            return new_false_branch_node, True
+        elif root_to_false_node_set.is_empty():
+            new_true_branch_node, is_true_modified = self.__new_prune_emptyset_branches(node.true_branch_node,
+                                                                                        root_to_true_node_set)
+            return new_true_branch_node, True
+        else:
+            new_false_branch_node, is_false_modified = self.__new_prune_emptyset_branches(node.false_branch_node,
+                                                                                          root_to_false_node_set)
+            new_true_branch_node, is_true_modified = self.__new_prune_emptyset_branches(node.true_branch_node,
+                                                                                        root_to_true_node_set)
+            if is_false_modified or is_true_modified:
+                return Node(bset=node.bset, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node), True
+            else:
+                return node, False
 
     def __is_constraint_valid(self, bset, constraint_list):
         basic_set = isl.BasicSet.universe(self.get_space())
@@ -564,59 +616,6 @@ class Quast:
             memo[curr_node] = subtree_set
             return False, subtree_set
 
-    def __prune_redundant_branches(self, node, root_to_node_path):
-        if node.is_terminal():
-            return
-        for [vertex, branch] in root_to_node_path:
-            if self.__are_nodes_equal(node, vertex):
-                root_to_node_path.append([node, not branch])
-                self.__prune_branch(root_to_node_path)
-                node = root_to_node_path.pop()[0]
-                self.__prune_redundant_branches(node.true_branch_node if branch else node.false_branch_node,
-                                                root_to_node_path)
-                return
-            elif self.__are_nodes_equal(Node(bset=self.__negate_bset(node.bset)), vertex):
-                root_to_node_path.append([node, branch])
-                self.__prune_branch(root_to_node_path)
-                node = root_to_node_path.pop()[0]
-                self.__prune_redundant_branches(node.false_branch_node if branch else node.true_branch_node,
-                                                root_to_node_path)
-                return
-        root_to_node_path.append([node, True])
-        self.__prune_redundant_branches(node.true_branch_node, root_to_node_path)
-        node = root_to_node_path.pop()[0]
-        root_to_node_path.append([node, False])
-        self.__prune_redundant_branches(node.false_branch_node, root_to_node_path)
-        node = root_to_node_path.pop()[0]
-
-    def new_prune_redundant_branches(self):
-        self.root_node, temp_flag = self.__new_prune_redundant_branches(node=self.root_node, ancestors={})
-
-    # ancestors: maps set to true/false to indicate which branch was taken
-    def __new_prune_redundant_branches(self, node, ancestors):
-        if node.is_terminal():
-            return node, False
-
-        is_first_occurrence = node.bset not in ancestors
-        if is_first_occurrence:
-            ancestors[node.bset] = True
-        new_true_branch_node, is_true_modified = self.__new_prune_redundant_branches(node.true_branch_node, ancestors)
-        if is_first_occurrence:
-            ancestors[node.bset] = False
-        new_false_branch_node, is_false_modified = self.__new_prune_redundant_branches(node.false_branch_node, ancestors)
-        branch = ancestors[node.bset]
-        if is_first_occurrence:
-            del ancestors[node.bset]
-
-        if not is_first_occurrence and node.bset in ancestors:
-            return (new_true_branch_node if branch else new_false_branch_node), True
-        elif not is_first_occurrence and self.__negate_bset(node.bset) in ancestors:
-            return (new_false_branch_node if branch else new_true_branch_node), True
-        elif not is_false_modified and not is_true_modified:
-            return node, False
-        else:
-            return Node(bset=node.bset, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node), True
-
     def __prune_branch(self, root_to_node_path):
         node_to_skip, branch_to_skip = root_to_node_path[len(root_to_node_path) - 1][0], root_to_node_path[len(root_to_node_path) - 1][1]
         next_node = node_to_skip.false_branch_node if branch_to_skip is True else node_to_skip.true_branch_node
@@ -657,71 +656,26 @@ class Quast:
             memo_table[(root2, root1)] = are_isomorphic
             return are_isomorphic
 
-    def __update_predecessors_of_same_child_node(self, reachable_dict, target):
-        reachable_dict[target] = target.true_branch_node
-        self.__update_subDAG(reachable_dict, self.root_node)
-        reachable_dict.pop(target, None)
-        return reachable_dict
-
-    def __update_subDAG(self, old_to_new_nodes_dict, curr_node):
-        if curr_node not in old_to_new_nodes_dict:
-            return curr_node
-        elif old_to_new_nodes_dict[curr_node] is not None:
-            return old_to_new_nodes_dict[curr_node]
+    def __prune_equal_children_nodes(self, node, new_nodes_map):
+        if node.is_terminal():
+            return node, False
+        elif node in new_nodes_map:
+            return new_nodes_map[node], new_nodes_map[node] is node
+        elif node.true_branch_node is node.false_branch_node:
+            next_node, is_subtree_modified = self.__prune_equal_children_nodes(node.true_branch_node, new_nodes_map)
+            return next_node, True
         else:
-            new_true_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
-                                                        curr_node.true_branch_node)
-            new_false_branch_node = self.__update_subDAG(old_to_new_nodes_dict,
-                                                         curr_node.false_branch_node)
-            new_curr_node = Node(curr_node.bset, false_branch_node=new_false_branch_node,
-                                 true_branch_node=new_true_branch_node)
-            old_to_new_nodes_dict[curr_node] = new_curr_node
-            if curr_node is self.root_node:
-                self.root_node = new_curr_node
-            return new_curr_node
-
-    def __add_reachable_subDAG_into_dict(self, target, curr_node, reachable_dict, visited):
-        if curr_node in visited:
-            return visited[curr_node]
-        elif curr_node is target:
-            return True
-        elif curr_node.is_terminal():
-            return False
-        else:
-            is_true_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.true_branch_node,
-                                                                      reachable_dict, visited)
-            is_false_reachable = self.__add_reachable_subDAG_into_dict(target, curr_node.false_branch_node,
-                                                                       reachable_dict, visited)
-            if is_true_reachable or is_false_reachable:
-                reachable_dict[curr_node] = None
-            visited[curr_node] = is_true_reachable or is_false_reachable
-            return is_true_reachable or is_false_reachable
-
-    def __get_reachable_subDAG_as_dict(self, target):
-        reachable_dict = {}
-        visited = {}
-        self.__add_reachable_subDAG_into_dict(target=target, curr_node=self.root_node, reachable_dict=reachable_dict, visited=visited)
-        return reachable_dict
-
-    def __prune_equal_children_node(self, curr_node):
-        if curr_node.is_terminal():
-            return None
-        elif curr_node.true_branch_node is curr_node.false_branch_node:
-            reachable_dict1 = self.__update_predecessors_of_same_child_node(target=curr_node,
-                                                                            reachable_dict=self.__get_reachable_subDAG_as_dict(
-                                                                                curr_node))
-            reachable_dict2 = self.__prune_equal_children_node(curr_node.true_branch_node)
-            return reachable_dict1 if reachable_dict2 is None else reachable_dict2
-        else:
-            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.true_branch_node)
-            if reachable_dict is not None:
-                curr_node = reachable_dict[curr_node]
-            reachable_dict = self.__prune_equal_children_node(curr_node=curr_node.false_branch_node)
-            if reachable_dict is not None:
-                curr_node = reachable_dict[curr_node]
-            if curr_node.true_branch_node is curr_node.false_branch_node:
-                reachable_dict = self.__prune_equal_children_node(curr_node)
-            return reachable_dict
+            new_true_branch_node, is_true_branch_modified = self.__prune_equal_children_nodes(node.true_branch_node,
+                                                                                              new_nodes_map)
+            new_false_branch_node, is_false_branch_modified = self.__prune_equal_children_nodes(node.false_branch_node,
+                                                                                                new_nodes_map)
+            if is_true_branch_modified or is_false_branch_modified:
+                new_node = Node(bset=node.bset, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node)
+                new_nodes_map[node] = new_node
+                return new_node, True
+            else:
+                new_nodes_map[node] = node
+                return node, False
 
     def __are_nodes_equal(self, node1, node2):
         return node1.node_type == node2.node_type and node1.bset == node2.bset

@@ -1,0 +1,4 @@
+// Quast Visualization
+digraph {
+	root [label=TERMINAL]
+}
