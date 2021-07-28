@@ -118,6 +118,7 @@ class Quast:
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
         union_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
+        union_quast.prune_redundant_branches()
         return union_quast
 
     def intersect(self, quast):
@@ -127,6 +128,7 @@ class Quast:
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
         intersection_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
+        intersection_quast.prune_redundant_branches()
         return intersection_quast
 
     def reconstruct_set(self):
@@ -186,9 +188,7 @@ class Quast:
         dot.render('visualization-output/'+output_filename, view=True)
 
     def is_empty(self):
-        memo = {self.in_node: isl.BasicSet.universe(self.get_space()), self.out_node: isl.BasicSet.empty(self.get_space())}
-        is_empty, set_ = self.__is_empty(self.root_node, isl.BasicSet.universe(self.get_space()), memo)
-        return is_empty
+        return self.__is_empty(self.root_node, isl.Set.universe(self.get_space()), isl.Set.empty(self.get_space()))
 
     def is_subset(self, quast):
         return self.intersect(quast.complement()).is_empty()
@@ -234,28 +234,27 @@ class Quast:
     def subtract(self, quast):
         return self.intersect(quast.complement())
 
+    def copy(self):
+        quast_copy = Quast(space=self.get_space(), in_node=self.in_node, out_node=self.out_node)
+        quast_copy.root_node = self.root_node
+        return quast_copy
     ########################################################################
     # Internal implementation of set operations in quast representation
     ########################################################################
 
-    def __is_empty(self, curr_node, root_to_node_path_bset, memo):
-        if curr_node in memo:
-            curr_path_set = root_to_node_path_bset.intersect(memo[curr_node])
-            return curr_path_set.is_empty(), memo[curr_node]
-        elif root_to_node_path_bset.is_empty():
-            return True, isl.BasicSet.universe(self.get_space())
+    def __is_empty(self, curr_node, root_to_node_true_set, root_to_node_false_set):
+        if curr_node is self.in_node:
+            return root_to_node_true_set.is_subset(root_to_node_false_set)
+        elif curr_node is self.out_node:
+            return True
         else:
-            true_root_to_node_path_bset = root_to_node_path_bset.intersect(curr_node.bset)
-            is_true_branch_empty, true_branch_set = self.__is_empty(curr_node.true_branch_node, true_root_to_node_path_bset, memo)
+            new_root_to_node_true_set = root_to_node_true_set.intersect(curr_node.bset)
+            is_true_branch_empty = self.__is_empty(curr_node.true_branch_node, new_root_to_node_true_set, root_to_node_false_set)
             if not is_true_branch_empty:
-                return False, true_branch_set
-            false_root_to_node_path_bset = root_to_node_path_bset.intersect(self.__negate_bset(curr_node.bset))
-            is_false_branch_empty, false_branch_set = self.__is_empty(curr_node.false_branch_node, false_root_to_node_path_bset, memo)
-            if not is_false_branch_empty:
-                return False, false_branch_set
-            subtree_set = curr_node.bset.intersect(true_branch_set).union(self.__negate_bset(curr_node.bset).intersect(false_branch_set))
-            memo[curr_node] = subtree_set
-            return True, subtree_set
+                return False
+            new_root_to_node_false_set = root_to_node_false_set.union(curr_node.bset)
+            is_false_branch_empty = self.__is_empty(curr_node.false_branch_node, root_to_node_true_set, new_root_to_node_false_set)
+            return is_false_branch_empty
 
     def __project_out(self, tree_expansion, curr_node, project_out_quast, root_to_node_path, dim_type, first, n):
         if curr_node is tree_expansion.in_node:

@@ -1,4 +1,15 @@
 // Quast Visualization
 digraph {
-	root [label=TERMINAL]
+	4500539712 [label=" x >= 0 "]
+	4500539208 [label=OUT]
+	4500539712 -> 4500539208 [label=F]
+	4500539712 [label=" x >= 0 "]
+	4500539320 [label=" x < 0 "]
+	4500539712 -> 4500539320 [label=T]
+	4500539320 [label=" x < 0 "]
+	4500539152 [label=IN]
+	4500539320 -> 4500539152 [label=T]
+	4500539320 [label=" x < 0 "]
+	4500539208 [label=OUT]
+	4500539320 -> 4500539208 [label=F]
 }
