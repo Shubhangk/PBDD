@@ -432,7 +432,7 @@ class Quast:
     ######################################################################
 
     def prune_redundant_branches(self):
-        self.root_node, _ = self.__prune_redundant_branches(node=self.root_node, ancestors={})
+        self.root_node, _ = self.__prune_redundant_branches(node=self.root_node, ancestors={}, new_nodes_map={})
 
     def prune_emptyset_branches(self):
         self.root_node, _ = self.__prune_emptyset_branches(self.root_node, isl.Set.universe(self.get_space()))
@@ -449,7 +449,7 @@ class Quast:
             num_modifications = num_modifications + 1
 
     def simplify(self):
-        #self.prune_redundant_branches()
+        self.prune_redundant_branches()
         self.prune_emptyset_branches()
         self.prune_isomorphic_subtrees()
         #self.prune_equal_children_node()
@@ -459,31 +459,41 @@ class Quast:
     ########################################################################
 
     # ancestors: maps set to true/false to indicate which branch was taken
-    def __prune_redundant_branches(self, node, ancestors):
+    def __prune_redundant_branches(self, node, ancestors, new_nodes_map):
         if node.is_terminal():
             return node, False
-
         is_first_occurrence = node.bset not in ancestors
-        if is_first_occurrence:
-            ancestors[node.bset] = True
-        new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node, ancestors)
-        if is_first_occurrence:
-            ancestors[node.bset] = False
-        new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node,
-                                                                                   ancestors)
-        branch = ancestors[node.bset]
-        if is_first_occurrence:
-            del ancestors[node.bset]
-
-        if not is_first_occurrence and node.bset in ancestors:
-            return (new_true_branch_node if branch else new_false_branch_node), True
-        elif not is_first_occurrence and self.__negate_bset(node.bset) in ancestors:
-            return (new_false_branch_node if branch else new_true_branch_node), True
-        elif not is_false_modified and not is_true_modified:
-            return node, False
+        if not is_first_occurrence:
+            if node in new_nodes_map:
+                ancestor_branch = ancestors[node.bset]
+                if ancestor_branch in new_nodes_map[node]:
+                    return new_nodes_map[node][ancestor_branch], True
+                elif ancestor_branch:
+                    new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node,
+                                                                                             ancestors, new_nodes_map)
+                    new_nodes_map[node][ancestor_branch] = new_true_branch_node
+                    return new_true_branch_node, True
+                else:
+                    new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node,
+                                                                                               ancestors, new_nodes_map)
+                    new_nodes_map[node][ancestor_branch] = new_false_branch_node
+                    return new_false_branch_node, True
+            else:
+                new_nodes_map[node] = {}
+                return self.__prune_redundant_branches(node, ancestors, new_nodes_map)
         else:
-            return Node(bset=node.bset, false_branch_node=new_false_branch_node,
-                        true_branch_node=new_true_branch_node), True
+            ancestors[node.bset] = True
+            new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node, ancestors, new_nodes_map)
+            ancestors[node.bset] = False
+            new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node,
+                                                                                       ancestors, new_nodes_map)
+            del ancestors[node.bset]
+            if not is_false_modified and not is_true_modified:
+                return node, False
+            else:
+                new_node = Node(bset=node.bset, false_branch_node=new_false_branch_node,
+                                true_branch_node=new_true_branch_node)
+                return new_node, True
 
     def __prune_emptyset_branches(self, node, root_to_node_set):
         if node.is_terminal():

@@ -67,7 +67,7 @@ def construct_quast():
     p_14 = isl.Set("[p_14] -> {[i0] : i0 = p_14 }")
     p_15 = isl.Set("[p_15] -> {[i0] : i0 = p_15 }")
 
-    p = [p_0, p_1, p_2, p_3, p_4, p_5, p_6, p_7, p_8, p_9, p_10, p_11, p_12, p_13, p_14]
+    p = [p_0, p_1, p_2, p_3, p_4, p_5, p_6, p_7, p_8, p_9, p_10, p_11, p_12, p_13, p_14, p_15]
     q = [Q.Quast(p_i) for p_i in p]
 
     num_experiments = 1
