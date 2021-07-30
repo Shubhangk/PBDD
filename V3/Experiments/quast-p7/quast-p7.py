@@ -102,8 +102,34 @@ def check_equality(t, set_, quast):
     print("--------------------------")
 
 
-if __name__ == "__main__":
+def testing_07_28():
     sys.setrecursionlimit(1500)
+    t = Timer()
+
+    str_set_1234 = "[p_0, p_1, p_2, p_3, p_4, p_5, p_6, p_7] -> { [i0] : (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6)}"
+    str_set_1233 = "[p_0, p_1, p_2, p_3, p_4, p_5, p_6, p_7] -> { [i0] : (i0 > p_1 and i0 > p_2 and i0 > p_3 and i0 > p_4 and i0 > p_5 and i0 > p_6 and i0 >= 0 and i0 < p_0) or (i0 > p_1 and i0 > p_2 and i0 > p_3 and i0 > p_4 and i0 > p_5 and i0 >= 0 and i0 < p_6 and i0 < p_0) }"
+    set_1234 = get_set(t, str_set_1234, "set_1234")
+    set_1233 = get_set(t, str_set_1233, "set_1233")
+    quast_1234 = get_quast(t, set_1234, "quast_1234")
+    quast_1233 = get_quast(t, set_1233, "quast_1233")
+    quast_1233.visualize_tree("before")
+    quast_1233.prune_redundant_branches()
+    #quast_1233.merge_nodes()
+    quast_1233.prune_equal_children_nodes()
+    quast_1233.merge_nodes()
+    quast_1233.visualize_tree("after")
+    print(quast_1233.reconstruct_set() == set_1233)
+    # set_1235 = intersect_sets(t, set_1234, set_1233, "set_1234", "set_1233")
+    # quast1235 = intersect_quasts(t, quast_1234, quast_1233, "quast_1234", "quast_1233")
+    # print(quast1235.reconstruct_set().is_subset(set_1235))
+    # print(set_1235.is_subset(quast1235.reconstruct_set()))
+    # print(quast1235.reconstruct_set() == set_1235)
+    # quast1235.visualize_tree()
+
+testing_07_28()
+
+def main():
+    sys.setrecursionlimit(1750)
     t = Timer()
 
     str_set_1234 = "[p_0, p_1, p_2, p_3, p_4, p_5, p_6, p_7] -> { [i0] : (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_3 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_2 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_3 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_1 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_3 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_2 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_3 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_4 and p_7 > p_5 and p_7 > p_6 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_4 and p_7 > p_5 and p_7 < p_6 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_4 and p_7 > p_6 and p_7 < p_5 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_4 and p_7 < p_6 and p_7 < p_5 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_5 and p_7 > p_6 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_5 and p_7 < p_6 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 > p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) or (i0 = p_7 and p_0 > 0 and p_7 < p_6 and p_7 < p_5 and p_7 < p_4 and p_7 < p_3 and p_7 < p_2 and p_7 < p_1) }"
@@ -136,7 +162,7 @@ if __name__ == "__main__":
     quast_2039 = get_quast(t, set_2039, "set_2039")
     set_2041 = subtract_sets(t, set_2040, set_2039, "set_2040", "set_2039")
     quast_2041 = subtract_quasts(t, quast_2040, quast_2039, "quast_2040", "quast_2039")
-    #check_equality(t, set_2041, quast_2041)
+    check_equality(t, set_2041, quast_2041)
 
     set_2056 = get_set(t, str_set_2056, "set_2056")
     set_2057 = set_2041
@@ -144,9 +170,9 @@ if __name__ == "__main__":
     quast_2057 = quast_2041
     set_2058 = subtract_sets(t, set_2057, set_2056, "set_2057", "set_2056")
     quast_2058 = subtract_quasts(t, quast_2057, quast_2056, "quast_2057", "quast_2056")
-    #check_equality(set_2058, quast_2058)
+    check_equality(set_2058, quast_2058)
 
     print("Exiting main()")
     print("--------------------------")
 
-
+# main()

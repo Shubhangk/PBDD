@@ -29,13 +29,13 @@ def construct_set():
         constraints = p[0:num_non_equality_constraints]
         for _ in range(num_experiments):
             set_ = isl.Set.universe(space)
-
+            start = timer()
             for p_i in constraints:
                 set_to_subtract = set_.intersect(p_i)
                 set_ = set_.subtract(set_to_subtract)
             #set_copy = set_.copy()
-            start = timer()
-            set_.is_empty()
+
+            #set_.is_empty()
             end = timer()
             time[num_non_equality_constraints] = time[num_non_equality_constraints] + end - start
         time[num_non_equality_constraints] = time[num_non_equality_constraints] / num_experiments
@@ -72,18 +72,20 @@ def construct_quast():
         constraints = q[0:num_non_equality_constraints]
         for _ in range(num_experiments):
             quast = Q.Quast(isl.Set.universe(space))
-
+            start = timer()
             for q_i in constraints:
                 quast_to_subtract = q_i.intersect(quast)
                 quast = quast.subtract(quast_to_subtract)
+                quast.prune_redundant_branches()
+                quast.prune_equal_children_nodes()
             #quast_copy = quast.copy()
-            start = timer()
-            quast.is_empty()
+
+           # quast.is_empty()
             end = timer()
             time[num_non_equality_constraints] = time[num_non_equality_constraints] + end - start
         time[num_non_equality_constraints] = time[num_non_equality_constraints] / num_experiments
 
-    #quast.visualize_tree()
+    quast.visualize_tree()
     return time
 
 

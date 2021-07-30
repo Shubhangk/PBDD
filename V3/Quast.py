@@ -27,7 +27,7 @@ class Quast:
                     T = bquast
                 else:
                     T = bquast.union(T)
-                    #T.prune_emptyset_branches()
+                    #T.prune_redundant_branches()
 
             # # merge-sort-like round-based initialization with quast simplification. This is a slower quast construction,
             # # but simplifies the final quast heavily
@@ -118,7 +118,7 @@ class Quast:
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
         union_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
-        union_quast.prune_redundant_branches()
+        #union_quast.prune_redundant_branches()
         return union_quast
 
     def intersect(self, quast):
@@ -128,7 +128,7 @@ class Quast:
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
         intersection_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
-        intersection_quast.prune_redundant_branches()
+        #intersection_quast.prune_redundant_branches()
         return intersection_quast
 
     def reconstruct_set(self):
@@ -431,7 +431,7 @@ class Quast:
     ######################################################################
 
     def prune_redundant_branches(self):
-        self.root_node, _ = self.__prune_redundant_branches(node=self.root_node, ancestors={}, new_nodes_map={})
+        self.root_node, _ = self.__prune_redundant_branches(node=self.root_node, true_branch_ancestors=set(), false_branch_ancestors=set(), memo={})
 
     def prune_emptyset_branches(self):
         self.root_node, _ = self.__prune_emptyset_branches(self.root_node, isl.Set.universe(self.get_space()))
@@ -450,48 +450,72 @@ class Quast:
     def simplify(self):
         self.prune_redundant_branches()
         self.prune_emptyset_branches()
-        self.prune_isomorphic_subtrees()
-        #self.prune_equal_children_node()
+        #self.prune_isomorphic_subtrees()
+        self.prune_equal_children_nodes()
 
+    def merge_nodes(self):
+        self.root_node, _ = self.__merge_nodes(self.root_node, {})
     ########################################################################
     # Internal implementation of quast optimization functions
     ########################################################################
 
-    # ancestors: maps set to true/false to indicate which branch was taken
-    def __prune_redundant_branches(self, node, ancestors, new_nodes_map):
+    # merge two nodes containing the same set (constraint) and pointing to the same children nodes
+    def __merge_nodes(self, node, memo):
         if node.is_terminal():
             return node, False
-        is_first_occurrence = node.bset not in ancestors
-        if not is_first_occurrence:
-            if node in new_nodes_map:
-                ancestor_branch = ancestors[node.bset]
-                if ancestor_branch in new_nodes_map[node]:
-                    return new_nodes_map[node][ancestor_branch], True
-                elif ancestor_branch:
-                    new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node,
-                                                                                             ancestors, new_nodes_map)
-                    new_nodes_map[node][ancestor_branch] = new_true_branch_node
-                    return new_true_branch_node, True
-                else:
-                    new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node,
-                                                                                               ancestors, new_nodes_map)
-                    new_nodes_map[node][ancestor_branch] = new_false_branch_node
-                    return new_false_branch_node, True
-            else:
-                new_nodes_map[node] = {}
-                return self.__prune_redundant_branches(node, ancestors, new_nodes_map)
+        elif (node.bset, node.true_branch_node, node.false_branch_node) in memo:
+            return node, True
         else:
-            ancestors[node.bset] = True
-            new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node, ancestors, new_nodes_map)
-            ancestors[node.bset] = False
-            new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node,
-                                                                                       ancestors, new_nodes_map)
-            del ancestors[node.bset]
-            if not is_false_modified and not is_true_modified:
+            new_true_branch_node, is_true_modified = self.__merge_nodes(node.true_branch_node, memo)
+            new_false_branch_node, is_false_modified = self.__merge_nodes(node.false_branch_node, memo)
+
+            if not is_true_modified and not is_false_modified:
+                memo[(node.bset, node.true_branch_node, node.false_branch_node)] = node
                 return node, False
             else:
-                new_node = Node(bset=node.bset, false_branch_node=new_false_branch_node,
-                                true_branch_node=new_true_branch_node)
+                new_node = Node(bset=node.bset, true_branch_node=new_true_branch_node, false_branch_node=new_false_branch_node)
+                memo[(node.bset, node.true_branch_node, node.false_branch_node)] = new_node
+                return new_node, True
+
+    # ancestors: maps set to true/false to indicate which branch was taken
+    def __prune_redundant_branches(self, node, true_branch_ancestors, false_branch_ancestors, memo):
+        if node.is_terminal():
+            return node, False
+        fset_true_ancestors = frozenset(true_branch_ancestors)
+        fset_false_ancestors = frozenset(false_branch_ancestors)
+        if node not in memo:
+            memo[node] = {}
+        if fset_true_ancestors not in memo[node]:
+            memo[node][fset_true_ancestors] = {}
+        if fset_false_ancestors in memo[node][fset_true_ancestors]:
+            return memo[node][fset_true_ancestors][fset_false_ancestors]
+
+        if node.bset in true_branch_ancestors:
+            new_true_branch_node, _ = self.__prune_redundant_branches(node.true_branch_node,
+                                                                      true_branch_ancestors,
+                                                                      false_branch_ancestors, memo)
+            memo[node][fset_true_ancestors][fset_false_ancestors] = new_true_branch_node, True
+            return new_true_branch_node, True
+        elif node.bset in false_branch_ancestors:
+            new_false_branch_node, _ = self.__prune_redundant_branches(node.false_branch_node,
+                                                                       true_branch_ancestors,
+                                                                       false_branch_ancestors, memo)
+            memo[node][fset_true_ancestors][fset_false_ancestors] = new_false_branch_node, True
+            return new_false_branch_node, True
+        else:
+            true_branch_ancestors.add(node.bset)
+            new_true_branch_node, is_true_modified = self.__prune_redundant_branches(node.true_branch_node, true_branch_ancestors, false_branch_ancestors, memo)
+            true_branch_ancestors.remove(node.bset)
+
+            false_branch_ancestors.add(node.bset)
+            new_false_branch_node, is_false_modified = self.__prune_redundant_branches(node.false_branch_node, true_branch_ancestors, false_branch_ancestors, memo)
+            false_branch_ancestors.remove(node.bset)
+            if not is_false_modified and not is_true_modified:
+                memo[node][fset_true_ancestors][fset_false_ancestors] = node, False
+                return node, False
+            else:
+                new_node = Node(bset=node.bset, false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
+                memo[node][fset_true_ancestors][fset_false_ancestors] = new_node, True
                 return new_node, True
 
     def __prune_emptyset_branches(self, node, root_to_node_set):
