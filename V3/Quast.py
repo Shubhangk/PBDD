@@ -118,7 +118,8 @@ class Quast:
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
         union_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
-        #union_quast.prune_redundant_branches()
+        union_quast.prune_redundant_branches()
+        union_quast.simplify()
         return union_quast
 
     def intersect(self, quast):
@@ -128,7 +129,8 @@ class Quast:
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
         intersection_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
-        #intersection_quast.prune_redundant_branches()
+        intersection_quast.prune_redundant_branches()
+        intersection_quast.simplify()
         return intersection_quast
 
     def reconstruct_set(self):
@@ -224,12 +226,19 @@ class Quast:
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
-    def project_out(self, dim_type, first, n, ):
-        T = self.__get_tree_expansion()
-        project_out_quast = Quast(space=T.get_space())
-        root_to_node_path = []
-        self.__project_out(T, T.root_node, project_out_quast, root_to_node_path, dim_type, first, n)
-        return project_out_quast
+    def project_out(self, dim_type, first, n ):
+        # T = self.__get_tree_expansion()
+        # project_out_quast = Quast(space=T.get_space())
+        # root_to_node_path = []
+        # self.__project_out(T, T.root_node, project_out_quast, root_to_node_path, dim_type, first, n)
+        # return project_out_quast
+        T = Quast(space=self.get_space(), in_node=self.in_node, out_node=self.out_node)
+        T.root_node = self.__project_out_(self.root_node, T, set(), {}, dim_type, first, n)
+        T.set_space(T.root_node.bset.get_space())
+        return T
+
+
+
 
     def subtract(self, quast):
         return self.intersect(quast.complement())
@@ -242,9 +251,11 @@ class Quast:
     # Internal implementation of set operations in quast representation
     ########################################################################
 
+    # root_to_node_true_set: is an isl.BasicSet of all the TRUE constraints along root to node path
+    # root_to_node_false_set: isl.Set (only or constraints) of all the FALSE constraints along the root to node path
     def __is_empty(self, curr_node, root_to_node_true_set, root_to_node_false_set):
         if curr_node is self.in_node:
-            return root_to_node_true_set.is_subset(root_to_node_false_set)
+            return root_to_node_true_set.is_subset(root_to_node_false_set) #isl.Set.is_subset()
         elif curr_node is self.out_node:
             return True
         else:
@@ -426,6 +437,44 @@ class Quast:
                 expansion_quast.root_node = new_node
             return new_node
 
+    def __project_out_(self, node, project_out_quast, root_to_node_set, memo, dim_type, first, n):
+        if node is self.in_node:
+            if not root_to_node_set:
+                return project_out_quast.in_node
+            else:
+                new_set = isl.Set.universe(self.get_space())
+                for bset in root_to_node_set:
+                    new_set = new_set.intersect(bset)
+                new_set = new_set.project_out(dim_type, first, n)
+                new_node = Node(bset=new_set, true_branch_node=project_out_quast.in_node, false_branch_node=project_out_quast.out_node)
+                return new_node
+        elif node is self.out_node:
+            return project_out_quast.out_node
+        else:
+            fset = frozenset(root_to_node_set)
+            if node in memo:
+                if fset in memo[node]:
+                    return memo[root_to_node_set]
+            else:
+                memo[node] = {}
+
+            if node.bset.involves_dims(dim_type, first, n):
+                root_to_node_set.add(node.bset)
+                new_true_branch_node = self.__project_out_(node.true_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
+                root_to_node_set.remove(node.bset)
+                negated_set = self.__negate_bset(node.bset)
+                root_to_node_set.add(negated_set)
+                new_false_branch_node = self.__project_out_(node.false_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
+                root_to_node_set.remove(negated_set)
+                new_node = self.__union(new_true_branch_node, {project_out_quast.out_node: new_false_branch_node, project_out_quast.in_node: project_out_quast.in_node})
+            else:
+                new_true_branch_node = self.__project_out_(node.true_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
+                new_false_branch_node = self.__project_out_(node.false_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
+                new_node = Node(node.bset.project_out(dim_type, first, n), false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
+
+            memo[node][fset] = new_node
+            return new_node
+
     ######################################################################
     # Quast API for optimizing tree representation of underlying sets
     ######################################################################
@@ -448,10 +497,36 @@ class Quast:
             num_modifications = num_modifications + 1
 
     def simplify(self):
-        self.prune_redundant_branches()
-        self.prune_emptyset_branches()
-        #self.prune_isomorphic_subtrees()
-        self.prune_equal_children_nodes()
+        self.root_node, _ = self.__simplify(self.root_node, {})
+
+    def __simplify(self, node, isomorphic_nodes_memo):
+        if node.is_terminal():
+            return node, False
+        elif (node.bset, node.true_branch_node, node.false_branch_node) in isomorphic_nodes_memo:
+            return isomorphic_nodes_memo[(node.bset, node.true_branch_node, node.false_branch_node)], True
+        else:
+            # post-order traversal
+            new_true_branch_node, is_true_modified = self.__simplify(node.true_branch_node, isomorphic_nodes_memo)
+            new_false_branch_node, is_false_modified = self.__simplify(node.false_branch_node, isomorphic_nodes_memo)
+
+            # prune redundant checks
+            if new_true_branch_node is new_false_branch_node:
+                isomorphic_nodes_memo[(node.bset, node.true_branch_node, node.false_branch_node)] = new_true_branch_node
+                return new_true_branch_node, True
+
+            if (node.bset, new_true_branch_node, new_false_branch_node) in isomorphic_nodes_memo:
+                return isomorphic_nodes_memo[(node.bset, new_true_branch_node, new_false_branch_node)], True
+
+            # case where node or any subtrees not to be pruned
+            elif not is_true_modified and not is_false_modified:
+                isomorphic_nodes_memo[(node.bset, node.true_branch_node, node.false_branch_node)] = node
+                return node, False
+            # case where subtree has been pruned but node not to be pruned
+            else:
+                new_node = Node(bset=node.bset, true_branch_node=new_true_branch_node,
+                                false_branch_node=new_false_branch_node)
+                isomorphic_nodes_memo[(node.bset, new_true_branch_node, new_false_branch_node)] = new_node
+                return new_node, True
 
     def merge_nodes(self):
         self.root_node, _ = self.__merge_nodes(self.root_node, {})
@@ -464,7 +539,7 @@ class Quast:
         if node.is_terminal():
             return node, False
         elif (node.bset, node.true_branch_node, node.false_branch_node) in memo:
-            return node, True
+            return (node.bset, node.true_branch_node, node.false_branch_node), True
         else:
             new_true_branch_node, is_true_modified = self.__merge_nodes(node.true_branch_node, memo)
             new_false_branch_node, is_false_modified = self.__merge_nodes(node.false_branch_node, memo)

@@ -126,7 +126,7 @@ def testing_07_28():
     # print(quast1235.reconstruct_set() == set_1235)
     # quast1235.visualize_tree()
 
-testing_07_28()
+#testing_07_28()
 
 def main():
     sys.setrecursionlimit(1750)
@@ -175,4 +175,4 @@ def main():
     print("Exiting main()")
     print("--------------------------")
 
-# main()
+main()

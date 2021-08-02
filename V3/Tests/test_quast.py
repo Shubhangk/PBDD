@@ -276,6 +276,17 @@ class TestQuast(unittest.TestCase):
         self.assertTrue(
             a.project_out(isl.dim_type.set, 4, 2).reconstruct_set() == A.project_out(isl.dim_type.set, 4, 2))
 
+    def test_project_out__1(self):
+        A = isl.Set("{[x,y,z]: (x = 2y and x + y + z >= 0 and y > z)}")
+        B = isl.Set("{[x,y,z]: (x = 2y and x + y + z >= 0 and y < z and x >= 0)}")
+        a = Q.Quast(A)
+        b = Q.Quast(B)
+        c = b.union(a)
+        d = c.project_out(isl.dim_type.set, 0, 1)
+        C = B.union(A)
+        D = C.project_out(isl.dim_type.set, 0, 1)
+        self.assertTrue(D == d.reconstruct_set())
+
     def test_apply__0(self):
         bmap = isl.BasicMap("{[x,y] -> [2x, 2y]:}")
         bset = isl.BasicSet("{[x,y]: x = 4}")

@@ -76,8 +76,9 @@ def construct_quast():
             for q_i in constraints:
                 quast_to_subtract = q_i.intersect(quast)
                 quast = quast.subtract(quast_to_subtract)
+                #quast.simplify()
                 quast.prune_redundant_branches()
-                quast.prune_equal_children_nodes()
+                # quast.prune_equal_children_nodes()
             #quast_copy = quast.copy()
 
            # quast.is_empty()
@@ -89,12 +90,21 @@ def construct_quast():
     return time
 
 
-if __name__ == "__main__":
-    quast_times = construct_quast()
-    print(quast_times)
-    set_times = construct_set()
-    print(set_times)
-    # x_axis = [i for i in range(len(quast_times))]
-    # plt.plot(x_axis, quast_times, 'r--', x_axis, set_times, 'b--')
-    # plt.savefig('/Users/shubhangkulkarni/PycharmProjects/ANLSummer21/V3/subset_plot.pdf')
-    # plt.show()
+# if __name__ == "__main__":
+#     # quast_times = construct_quast()
+#     # print(quast_times)
+#     # set_times = construct_set()
+#     # print(set_times)
+#     # x_axis = [i for i in range(len(quast_times))]
+#     # plt.plot(x_axis, quast_times, 'r--', x_axis, set_times, 'b--')
+#     # plt.savefig('/Users/shubhangkulkarni/PycharmProjects/ANLSummer21/V3/subset_plot.pdf')
+#     # plt.show()
+
+def simplify_bug():
+    A = isl.Set(
+        "[p_0, p_1, p_2, p_3, p_4, p_5, p_6] -> { [i0] : (p_1 < 0 and i0 > p_2 and i0 > p_3 and i0 > p_4 and i0 >= 0 and i0 < p_0) or (p_1 < 0 and i0 > p_2 and i0 > p_3 and i0 >= 0 and i0 < p_4 and i0 < p_0)}")
+    a = Q.Quast(A)
+    print(a.project_out(isl.dim_type.param, 2, 3).reconstruct_set() == A.project_out(isl.dim_type.param, 2, 3))
+ #   a.simplify()
+
+simplify_bug()
