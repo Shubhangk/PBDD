@@ -17,8 +17,6 @@ class Quast:
 
         # initialize when isl.Set is provided
         if set_ is not None:
-
-            # normal quast construction. This is much faster than below, but does not simplify the final quast.
             T = None
             for basic_set in set_.get_basic_sets():
                 bquast = BasicQuast(basic_set)
@@ -26,50 +24,12 @@ class Quast:
                     T = bquast
                 else:
                     T = bquast.union(T)
-                    #T.prune_redundant_branches()
-
-            # # merge-sort-like round-based initialization with quast simplification. This is a slower quast construction,
-            # # but simplifies the final quast heavily
-            # quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
-            # new_quast_list = []
-            # offset = len(quast_list) % 2
-            # while len(quast_list) > 1:
-            #     for i in range(0, len(quast_list) - offset, 2):
-            #         new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
-            #         new_quast_list[-1].simplify()
-            #     if offset == 1:
-            #         new_quast_list.append(quast_list[-1])
-            #     offset = len(quast_list) % 2
-            #     quast_list = new_quast_list
-            #     new_quast_list = []
-            # T = quast_list[0]
-
-            # # Hybrid construction approach
-            # quast_list = [BasicQuast(bset) for bset in set_.get_basic_sets()]
-            # new_quast_list = []
-            # offset = len(quast_list) % 2
-            # rounds = 0
-            # while len(quast_list) > 1 and rounds < 4:
-            #     for i in range(0, len(quast_list) - offset, 2):
-            #         new_quast_list.append(quast_list[i].union(quast_list[i + 1]))
-            #         new_quast_list[-1].simplify()
-            #     if offset == 1:
-            #         new_quast_list.append(quast_list[-1])
-            #     offset = len(quast_list) % 2
-            #     quast_list = new_quast_list
-            #     new_quast_list = []
-            #     rounds = rounds + 1
-            # T = quast_list[0]
-            # if len(quast_list) != 1:
-            #     for quast in quast_list:
-            #         T = quast.union(T)
-
             self.update_num_nodes(T.get_tree_size())
             self.root_node = T.root_node
             self.in_node = T.in_node
             self.out_node = T.out_node
             self.set_space(T.get_space())
-        # initialize when isl.Set is not provided (also from super.__init__() call from BasicQuast)
+        # initialize when isl.Set is not provided (also by super.__init__() call from BasicQuast)
         else:
             if space is None:
                 raise Exception("Cannot initialize Quast with Space None")
@@ -191,6 +151,21 @@ class Quast:
         quast_copy.root_node = self.root_node
         return quast_copy
 
+    def flat_product(self, quast):
+        extension_space = quast.get_space()
+        extended_space = self.__get_extended_space(extension_space)
+        extended_space_self = Quast(space=extended_space)
+        extended_space_quast = Quast(space=extended_space)
+        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_self, False)
+        quast.__project_quast_into_extended_space(quast.root_node, extended_space, extended_space_quast, True)
+        return extended_space_self.intersect(extended_space_quast)
+
+    def extend_space(self, extension_space):
+        extended_space = self.__get_extended_space(extension_space)
+        extended_space_quast = Quast(space=extended_space)
+        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
+        return extended_space_quast
+
     ################################################################
     # Wrappers for islpy.Set functions (for callbacks)
     ################################################################
@@ -263,22 +238,6 @@ class Quast:
             dot.node('root', self.root_node.bset)
         #print(dot.source)
         dot.render('visualization-output/'+output_filename, view=True)
-
-    def flat_product(self, quast):
-        extension_space = quast.get_space()
-        extended_space = self.__get_extended_space(extension_space)
-        extended_space_self = Quast(space=extended_space)
-        extended_space_quast = Quast(space=extended_space)
-        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_self, False)
-        quast.__project_quast_into_extended_space(quast.root_node, extended_space, extended_space_quast, True)
-        return extended_space_self.intersect(extended_space_quast)
-
-    def extend_space(self, extension_space):
-        extended_space = self.__get_extended_space(extension_space)
-        extended_space_quast = Quast(space=extended_space)
-        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
-        return extended_space_quast
-
 
     ########################################################################
     # Internal implementation of set operations in quast representation
