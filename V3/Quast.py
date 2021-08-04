@@ -2,7 +2,6 @@ import islpy as isl
 from graphviz import Digraph
 from V2.Node import *
 
-
 class Quast:
     """
     Quasi-Affine solution tree representation of islpy.Sets. Each Quast instance has the following variable attributes
@@ -78,6 +77,75 @@ class Quast:
             self.out_node = Node(bset="TERMINAL", node_type=Node.TERMINAL) if out_node is None else out_node
             self.set_space(space)
             self.root_node = None
+
+    ################################################################
+    # isltrace.c specific set functions
+    ################################################################
+    @staticmethod
+    def from_basic_set(bset):
+        return Quast(bset)
+
+    @staticmethod
+    def empty(space):
+        quast = Quast(space=space)
+        quast.root_node = quast.out_node
+        return quast
+
+    @staticmethod
+    def universe(space):
+        quast = Quast(space=space)
+        quast.root_node = quast.in_node
+        return quast
+
+    def add_dims(self, type, n):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_add_dims, type, n)
+
+    def remove_dims(self, type, first, n):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_remove_dims, type, first, n)
+
+    def insert_dims(self, type, pos, n):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_insert_dims, type, pos, n)
+
+    def align_params(self, model):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_align_params, model)
+
+    def apply(self, map_):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_apply, map_)
+
+    def params(self):
+        return isl.Set.universe(self.get_space()).params()
+
+    def __isl_apply(self, set_, map_):
+        return set_.apply(map_)
+
+    def __isl_align_params(self, set_, model):
+        return set_.align_params(model)
+
+    def __isl_add_dims(self, set_, type, n):
+        return set_.add_dims(type, n)
+
+    def __isl_remove_dims(self, set_, type, first, n):
+        return set_.remove_dims(type, first, n)
+
+    def __isl_insert_dims(self, set_, type, pos, n):
+        return set_.insert_dims(type, pos, n)
+
+    def __apply_callback_to_every_node(self, node, memo, callback, *args):
+        if node.is_terminal():
+            return node
+        elif node in memo:
+            return memo[node]
+        else:
+            new_true_branch = self.__apply_callback_to_every_node(node.true_branch_node, memo, callback, args)
+            new_false_branch = self.__apply_callback_to_every_node(node.false_branch_node, memo, callback, args)
+            new_node = Node(callback(bset=node.bset), false_branch_node=new_false_branch, true_branch_node=new_true_branch)
+            memo[node] = new_node
+            return new_node
 
     ################################################################
     # Data structure specific functions
@@ -217,10 +285,10 @@ class Quast:
     def is_equal(self, quast):
         return self.reconstruct_set() == quast.reconstruct_set()
 
-    def apply(self, bmap):
-        mapped_quast = Quast(space=bmap.range().get_space())
-        self.__apply(self.root_node, mapped_quast, bmap)
-        return mapped_quast
+    # def apply(self, bmap):
+    #     mapped_quast = Quast(space=bmap.range().get_space())
+    #     self.__apply(self.root_node, mapped_quast, bmap)
+    #     return mapped_quast
 
     def flat_product(self, quast):
         extension_space = quast.get_space()
@@ -237,13 +305,13 @@ class Quast:
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
-    def add_dims(self, n):
-        dim_names = [("x" + str(i)) for i in range(n)]
-        extension_space = isl.Space.create_from_names(isl.DEFAULT_CONTEXT, set=dim_names)
-        extended_space = self.__get_extended_space(extension_space)
-        extended_space_quast = Quast(space=extended_space)
-        self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
-        return extended_space_quast
+    # def add_dims(self, n):
+    #     dim_names = [("x" + str(i)) for i in range(n)]
+    #     extension_space = isl.Space.create_from_names(isl.DEFAULT_CONTEXT, set=dim_names)
+    #     extended_space = self.__get_extended_space(extension_space)
+    #     extended_space_quast = Quast(space=extended_space)
+    #     self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
+    #     return extended_space_quast
 
     def project_out(self, dim_type, first, n):
         # get the new projected out space
@@ -327,22 +395,22 @@ class Quast:
     #                 project_out_quast.set_space(new_constraint.get_space())
     #             return new_node
 
-    def __apply(self, curr_node, mapped_quast, bmap):
-        if curr_node is self.in_node:
-            return mapped_quast.in_node
-        elif curr_node is self.out_node:
-            return mapped_quast.out_node
-        else:
-            new_true_branch = self.__apply(curr_node.true_branch_node, mapped_quast, bmap)
-            new_false_branch = self.__apply(curr_node.false_branch_node, mapped_quast, bmap)
-            space = curr_node.bset.get_space()
-            bset = isl.BasicSet.universe(space).intersect(curr_node.bset)
-            new_bset = bset.apply(bmap)
-            new_node = Node(bset=new_bset, false_branch_node=new_false_branch,
-                            true_branch_node=new_true_branch)
-            if curr_node is self.root_node:
-                mapped_quast.root_node = new_node
-            return new_node
+    # def __apply(self, curr_node, mapped_quast, bmap):
+    #     if curr_node is self.in_node:
+    #         return mapped_quast.in_node
+    #     elif curr_node is self.out_node:
+    #         return mapped_quast.out_node
+    #     else:
+    #         new_true_branch = self.__apply(curr_node.true_branch_node, mapped_quast, bmap)
+    #         new_false_branch = self.__apply(curr_node.false_branch_node, mapped_quast, bmap)
+    #         space = curr_node.bset.get_space()
+    #         bset = isl.BasicSet.universe(space).intersect(curr_node.bset)
+    #         new_bset = bset.apply(bmap)
+    #         new_node = Node(bset=new_bset, false_branch_node=new_false_branch,
+    #                         true_branch_node=new_true_branch)
+    #         if curr_node is self.root_node:
+    #             mapped_quast.root_node = new_node
+    #         return new_node
 
     def __intersect(self, curr_node, memo):
         if curr_node in memo:
@@ -737,3 +805,7 @@ class BasicQuast(Quast):
                 next_true_branch_node = node
             self.update_num_nodes(len(constraints_as_bsets))
             self.root_node = next_true_branch_node
+
+
+Q = Quast(isl.Set("{[x,y]: x >=0 and y >= 0}"))
+Q.__post_order_traversal(Q.root_node, {}, callback=Q.dump)
