@@ -264,64 +264,6 @@ class Quast:
         #print(dot.source)
         dot.render('visualization-output/'+output_filename, view=True)
 
-    ####################################
-    # Quast API for set operations
-    ####################################
-
-
-
-    def __reconstruct_set_(self, curr_node):
-        if curr_node is self.in_node:
-            return isl.BasicSet.universe(self.get_space())
-        elif curr_node is self.out_node:
-            return isl.BasicSet.empty(self.get_space())
-        else:
-            true_branch_set = curr_node.bset.intersect(self.__reconstruct_set_(curr_node.true_branch_node))
-            false_branch_set = self.__negate_bset(curr_node.bset).intersect(
-                self.__reconstruct_set(curr_node.false_branch_node))
-            return true_branch_set.union(false_branch_set)
-
-    def __reconstruct_set(self, curr_node, memo):
-        # quast is a single node
-        if curr_node is self.in_node:
-            return isl.BasicSet.universe(self.get_space())
-        elif curr_node is self.out_node:
-            return isl.BasicSet.empty(self.get_space())
-        # current node has already been memoized
-        elif curr_node in memo:
-            return memo[curr_node]
-        # else compute memoization and memoize
-        else:
-            # true_branch_set = None
-            # false_branch_set = None
-            if curr_node.true_branch_node is self.in_node:
-                true_branch_set = curr_node.bset
-            elif curr_node.true_branch_node is self.out_node:
-                true_branch_set = isl.BasicSet.empty(self.get_space())
-            else:
-                true_branch_set = curr_node.bset.intersect(self.__reconstruct_set(curr_node.true_branch_node, memo))
-
-            if curr_node.false_branch_node is self.in_node:
-                false_branch_set = self.__negate_bset(curr_node.bset)
-            elif curr_node.false_branch_node is self.out_node:
-                false_branch_set = isl.BasicSet.empty(self.get_space())
-            else:
-                false_branch_set = self.__negate_bset(curr_node.bset).intersect(self.__reconstruct_set(curr_node.false_branch_node, memo))
-
-            curr_node_set = true_branch_set.union(false_branch_set)
-            memo[curr_node] = curr_node_set
-            return curr_node_set
-
-
-
-
-
-
-
-    # def apply(self, bmap):
-    #     mapped_quast = Quast(space=bmap.range().get_space())
-    #     self.__apply(self.root_node, mapped_quast, bmap)
-    #     return mapped_quast
 
     def flat_product(self, quast):
         extension_space = quast.get_space()
@@ -337,14 +279,6 @@ class Quast:
         extended_space_quast = Quast(space=extended_space)
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
-
-    # def add_dims(self, n):
-    #     dim_names = [("x" + str(i)) for i in range(n)]
-    #     extension_space = isl.Space.create_from_names(isl.DEFAULT_CONTEXT, set=dim_names)
-    #     extended_space = self.__get_extended_space(extension_space)
-    #     extended_space_quast = Quast(space=extended_space)
-    #     self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
-    #     return extended_space_quast
 
 
     ########################################################################
@@ -413,22 +347,47 @@ class Quast:
     #                 project_out_quast.set_space(new_constraint.get_space())
     #             return new_node
 
-    # def __apply(self, curr_node, mapped_quast, bmap):
-    #     if curr_node is self.in_node:
-    #         return mapped_quast.in_node
-    #     elif curr_node is self.out_node:
-    #         return mapped_quast.out_node
-    #     else:
-    #         new_true_branch = self.__apply(curr_node.true_branch_node, mapped_quast, bmap)
-    #         new_false_branch = self.__apply(curr_node.false_branch_node, mapped_quast, bmap)
-    #         space = curr_node.bset.get_space()
-    #         bset = isl.BasicSet.universe(space).intersect(curr_node.bset)
-    #         new_bset = bset.apply(bmap)
-    #         new_node = Node(bset=new_bset, false_branch_node=new_false_branch,
-    #                         true_branch_node=new_true_branch)
-    #         if curr_node is self.root_node:
-    #             mapped_quast.root_node = new_node
-    #         return new_node
+    def __reconstruct_set_(self, curr_node):
+        if curr_node is self.in_node:
+            return isl.BasicSet.universe(self.get_space())
+        elif curr_node is self.out_node:
+            return isl.BasicSet.empty(self.get_space())
+        else:
+            true_branch_set = curr_node.bset.intersect(self.__reconstruct_set_(curr_node.true_branch_node))
+            false_branch_set = self.__negate_bset(curr_node.bset).intersect(
+                self.__reconstruct_set(curr_node.false_branch_node))
+            return true_branch_set.union(false_branch_set)
+
+    def __reconstruct_set(self, curr_node, memo):
+        # quast is a single node
+        if curr_node is self.in_node:
+            return isl.BasicSet.universe(self.get_space())
+        elif curr_node is self.out_node:
+            return isl.BasicSet.empty(self.get_space())
+        # current node has already been memoized
+        elif curr_node in memo:
+            return memo[curr_node]
+        # else compute memoization and memoize
+        else:
+            # true_branch_set = None
+            # false_branch_set = None
+            if curr_node.true_branch_node is self.in_node:
+                true_branch_set = curr_node.bset
+            elif curr_node.true_branch_node is self.out_node:
+                true_branch_set = isl.BasicSet.empty(self.get_space())
+            else:
+                true_branch_set = curr_node.bset.intersect(self.__reconstruct_set(curr_node.true_branch_node, memo))
+
+            if curr_node.false_branch_node is self.in_node:
+                false_branch_set = self.__negate_bset(curr_node.bset)
+            elif curr_node.false_branch_node is self.out_node:
+                false_branch_set = isl.BasicSet.empty(self.get_space())
+            else:
+                false_branch_set = self.__negate_bset(curr_node.bset).intersect(self.__reconstruct_set(curr_node.false_branch_node, memo))
+
+            curr_node_set = true_branch_set.union(false_branch_set)
+            memo[curr_node] = curr_node_set
+            return curr_node_set
 
     def __intersect(self, curr_node, memo):
         if curr_node in memo:
@@ -517,25 +476,6 @@ class Quast:
             if curr_node is self.root_node:
                 extended_space_quast.root_node = extended_node
             return extended_node
-
-    # def __get_tree_expansion(self):
-    #     expansion_quast = Quast(space=self.get_space())
-    #     self.__expand_quast_into_tree(self.root_node, expansion_quast)
-    #     return expansion_quast
-    #
-    # def __expand_quast_into_tree(self, curr_node, expansion_quast):
-    #     if curr_node is self.in_node:
-    #         return expansion_quast.in_node
-    #     elif curr_node is self.out_node:
-    #         return expansion_quast.out_node
-    #     else:
-    #         expanded_true_branch_node = self.__expand_quast_into_tree(curr_node.true_branch_node, expansion_quast)
-    #         expanded_false_branch_node = self.__expand_quast_into_tree(curr_node.false_branch_node, expansion_quast)
-    #         new_node = Node(bset=curr_node.bset, true_branch_node=expanded_true_branch_node,
-    #                         false_branch_node=expanded_false_branch_node)
-    #         if curr_node is self.root_node:
-    #             expansion_quast.root_node = new_node
-    #         return new_node
 
     def __project_out_(self, node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n):
         if node is self.in_node:
