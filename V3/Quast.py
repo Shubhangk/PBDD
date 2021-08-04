@@ -79,7 +79,7 @@ class Quast:
             self.root_node = None
 
     ################################################################
-    # isltrace.c specific set functions
+    # Quast API for set operations
     ################################################################
     @staticmethod
     def from_basic_set(bset):
@@ -100,84 +100,35 @@ class Quast:
     def add_dims(self, type, n):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_add_dims, type, n)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
 
     def remove_dims(self, type, first, n):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_remove_dims, type, first, n)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
 
     def insert_dims(self, type, pos, n):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_insert_dims, type, pos, n)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
 
     def align_params(self, model):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_align_params, model)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
 
     def apply(self, map_):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_apply, map_)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
 
     def params(self):
         return isl.Set.universe(self.get_space()).params()
-
-    def __isl_apply(self, set_, map_):
-        return set_.apply(map_)
-
-    def __isl_align_params(self, set_, model):
-        return set_.align_params(model)
-
-    def __isl_add_dims(self, set_, type, n):
-        return set_.add_dims(type, n)
-
-    def __isl_remove_dims(self, set_, type, first, n):
-        return set_.remove_dims(type, first, n)
-
-    def __isl_insert_dims(self, set_, type, pos, n):
-        return set_.insert_dims(type, pos, n)
-
-    def __apply_callback_to_every_node(self, node, memo, callback, *args):
-        if node.is_terminal():
-            return node
-        elif node in memo:
-            return memo[node]
-        else:
-            new_true_branch = self.__apply_callback_to_every_node(node.true_branch_node, memo, callback, args)
-            new_false_branch = self.__apply_callback_to_every_node(node.false_branch_node, memo, callback, args)
-            new_node = Node(callback(bset=node.bset), false_branch_node=new_false_branch, true_branch_node=new_true_branch)
-            memo[node] = new_node
-            return new_node
-
-    ################################################################
-    # Data structure specific functions
-    ################################################################
-
-    def get_space(self):
-        return self.space
-
-    def set_space(self, new_space):
-        self.space = new_space
-
-    def get_tree_size(self):
-        return self.num_nodes
-
-    def set_tree_size(self, tree_size):
-        self.num_nodes = tree_size
-
-    def compute_tree_size(self):
-        return len(self.__get_node_set())
-
-    def increment_tree_size(self):
-        self.num_nodes = self.num_nodes + 1
-
-    def __decrement_tree_size(self):
-        self.num_nodes = self.num_nodes - 1
-
-    def update_num_nodes(self, num_additions):
-        self.num_nodes = self.num_nodes + num_additions
-
-    ####################################
-    # Quast API for set operations
-    ####################################
 
     def union(self, quast):
         # if self.get_space() != quast.get_space():
@@ -209,9 +160,115 @@ class Quast:
         intersection_quast.simplify()
         return intersection_quast
 
+    def complement(self):
+        complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
+        complement_quast.root_node = self.root_node
+        return complement_quast
+
+    def is_empty(self):
+        return self.__is_empty(self.root_node, isl.Set.universe(self.get_space()), isl.Set.empty(self.get_space()))
+
+    def is_subset(self, quast):
+        return self.intersect(quast.complement()).is_empty()
+
+    def is_equal(self, quast):
+        return self.reconstruct_set() == quast.reconstruct_set()
+
+    def project_out(self, dim_type, first, n):
+        # get the new projected out space
+        projected_out_universe = isl.Set.universe(self.get_space()).project_out(dim_type, first, n)
+        # create new projected out quast with the projected out space
+        project_out_quast = Quast(space=projected_out_universe.get_space(), in_node=self.in_node, out_node=self.out_node)
+        # construct the projected out quast
+        project_out_quast.root_node = self.__project_out_(self.root_node, project_out_quast, [], {}, projected_out_universe, dim_type, first, n)
+        return project_out_quast
+
+    def subtract(self, quast):
+        return self.intersect(quast.complement())
+
+    def copy(self):
+        quast_copy = Quast(space=self.get_space(), in_node=self.in_node, out_node=self.out_node)
+        quast_copy.root_node = self.root_node
+        return quast_copy
+
+    ################################################################
+    # Wrappers for islpy.Set functions (for callbacks)
+    ################################################################
+
+    def __isl_apply(self, set_, map_):
+        return set_.apply(map_)
+
+    def __isl_align_params(self, set_, model):
+        return set_.align_params(model)
+
+    def __isl_add_dims(self, set_, type, n):
+        return set_.add_dims(type, n)
+
+    def __isl_remove_dims(self, set_, type, first, n):
+        return set_.remove_dims(type, first, n)
+
+    def __isl_insert_dims(self, set_, type, pos, n):
+        return set_.insert_dims(type, pos, n)
+
+    def __apply_callback_to_every_node(self, node, memo, callback, *args):
+        if node.is_terminal():
+            return node
+        elif node in memo:
+            return memo[node]
+        else:
+            new_true_branch = self.__apply_callback_to_every_node(node.true_branch_node, memo, callback, *args)
+            new_false_branch = self.__apply_callback_to_every_node(node.false_branch_node, memo, callback, *args)
+            new_node = Node(callback(node.bset, *args), false_branch_node=new_false_branch, true_branch_node=new_true_branch)
+            memo[node] = new_node
+            return new_node
+
+    ################################################################
+    # Data structure specific functions
+    ################################################################
+
+    def get_space(self):
+        return self.space
+
+    def set_space(self, new_space):
+        self.space = new_space
+
+    def get_tree_size(self):
+        return self.num_nodes
+
+    def set_tree_size(self, tree_size):
+        self.num_nodes = tree_size
+
+    def compute_tree_size(self):
+        return len(self.__get_node_set())
+
+    def update_num_nodes(self, num_additions):
+        self.num_nodes = self.num_nodes + num_additions
+
     def reconstruct_set(self):
         memo = {}
         return self.__reconstruct_set(self.root_node, memo)
+
+    def visualize_tree(self, output_filename='quast'):
+        dot = Digraph(format="pdf", comment='Quast Visualization')
+        arcs = set()
+        self.__visualize_tree(arcs, self.root_node)
+        nodes = set()
+        for arc in arcs:
+            if arc[0] not in nodes:
+                dot.node(str(id(arc[0])), self.__get_visualization_label(arc[0]))
+            if arc[1] not in nodes:
+                dot.node(str(id(arc[1])), self.__get_visualization_label(arc[1]))
+            dot.edge(str(id(arc[0])), str(id(arc[1])), label=arc[2])
+        if arcs == set():
+            dot.node('root', self.root_node.bset)
+        #print(dot.source)
+        dot.render('visualization-output/'+output_filename, view=True)
+
+    ####################################
+    # Quast API for set operations
+    ####################################
+
+
 
     def __reconstruct_set_(self, curr_node):
         if curr_node is self.in_node:
@@ -255,35 +312,11 @@ class Quast:
             memo[curr_node] = curr_node_set
             return curr_node_set
 
-    def complement(self):
-        complement_quast = Quast(space=self.get_space(), in_node=self.out_node, out_node=self.in_node)
-        complement_quast.root_node = self.root_node
-        return complement_quast
 
-    def visualize_tree(self, output_filename='quast'):
-        dot = Digraph(format="pdf", comment='Quast Visualization')
-        arcs = set()
-        self.__visualize_tree(arcs, self.root_node)
-        nodes = set()
-        for arc in arcs:
-            if arc[0] not in nodes:
-                dot.node(str(id(arc[0])), self.__get_visualization_label(arc[0]))
-            if arc[1] not in nodes:
-                dot.node(str(id(arc[1])), self.__get_visualization_label(arc[1]))
-            dot.edge(str(id(arc[0])), str(id(arc[1])), label=arc[2])
-        if arcs == set():
-            dot.node('root', self.root_node.bset)
-        #print(dot.source)
-        dot.render('visualization-output/'+output_filename, view=True)
 
-    def is_empty(self):
-        return self.__is_empty(self.root_node, isl.Set.universe(self.get_space()), isl.Set.empty(self.get_space()))
 
-    def is_subset(self, quast):
-        return self.intersect(quast.complement()).is_empty()
 
-    def is_equal(self, quast):
-        return self.reconstruct_set() == quast.reconstruct_set()
+
 
     # def apply(self, bmap):
     #     mapped_quast = Quast(space=bmap.range().get_space())
@@ -313,22 +346,7 @@ class Quast:
     #     self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
     #     return extended_space_quast
 
-    def project_out(self, dim_type, first, n):
-        # get the new projected out space
-        projected_out_universe = isl.Set.universe(self.get_space()).project_out(dim_type, first, n)
-        # create new projected out quast with the projected out space
-        project_out_quast = Quast(space=projected_out_universe.get_space(), in_node=self.in_node, out_node=self.out_node)
-        # construct the projected out quast
-        project_out_quast.root_node = self.__project_out_(self.root_node, project_out_quast, [], {}, projected_out_universe, dim_type, first, n)
-        return project_out_quast
 
-    def subtract(self, quast):
-        return self.intersect(quast.complement())
-
-    def copy(self):
-        quast_copy = Quast(space=self.get_space(), in_node=self.in_node, out_node=self.out_node)
-        quast_copy.root_node = self.root_node
-        return quast_copy
     ########################################################################
     # Internal implementation of set operations in quast representation
     ########################################################################
@@ -805,7 +823,3 @@ class BasicQuast(Quast):
                 next_true_branch_node = node
             self.update_num_nodes(len(constraints_as_bsets))
             self.root_node = next_true_branch_node
-
-
-Q = Quast(isl.Set("{[x,y]: x >=0 and y >= 0}"))
-Q.__post_order_traversal(Q.root_node, {}, callback=Q.dump)
