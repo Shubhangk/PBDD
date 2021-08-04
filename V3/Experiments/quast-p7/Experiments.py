@@ -104,7 +104,9 @@ def simplify_bug():
     A = isl.Set(
         "[p_0, p_1, p_2, p_3, p_4, p_5, p_6] -> { [i0] : (p_1 < 0 and i0 > p_2 and i0 > p_3 and i0 > p_4 and i0 >= 0 and i0 < p_0) or (p_1 < 0 and i0 > p_2 and i0 > p_3 and i0 >= 0 and i0 < p_4 and i0 < p_0)}")
     a = Q.Quast(A)
-    print(a.project_out(isl.dim_type.param, 2, 3).reconstruct_set() == A.project_out(isl.dim_type.param, 2, 3))
+    b = a.project_out(isl.dim_type.param, 0, 3)
+    print(b.reconstruct_set() == A.project_out(isl.dim_type.param, 0, 3))
+    a.visualize_tree()
  #   a.simplify()
 
 simplify_bug()

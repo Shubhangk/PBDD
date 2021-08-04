@@ -112,9 +112,13 @@ class Quast:
     ####################################
 
     def union(self, quast):
-        if self.get_space() != quast.get_space():
-            raise Exception("spaces don't match")
-        union_quast = Quast(space=quast.get_space(), in_node=quast.in_node, out_node=quast.out_node)
+        # if self.get_space() != quast.get_space():
+        #     raise Exception("spaces don't match")
+        if not self.root_node.is_terminal():
+            union_space = self.root_node.bset.union(quast.root_node.bset).get_space()
+        else:
+            union_space = self.get_space()
+        union_quast = Quast(space=union_space, in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
         union_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
@@ -125,7 +129,11 @@ class Quast:
     def intersect(self, quast):
         # if self.get_space() != quast.get_space():
         #     raise Exception("spaces don't match")
-        intersection_quast = Quast(space=self.get_space(), in_node=quast.in_node, out_node=quast.out_node)
+        if not self.root_node.is_terminal():
+            intersection_space = self.root_node.bset.intersect(quast.root_node.bset).get_space()
+        else:
+            intersection_space = self.get_space()
+        intersection_quast = Quast(space=intersection_space, in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
         intersection_quast.set_tree_size(self.get_tree_size() + quast.get_tree_size())
@@ -136,6 +144,17 @@ class Quast:
     def reconstruct_set(self):
         memo = {}
         return self.__reconstruct_set(self.root_node, memo)
+
+    def __reconstruct_set_(self, curr_node):
+        if curr_node is self.in_node:
+            return isl.BasicSet.universe(self.get_space())
+        elif curr_node is self.out_node:
+            return isl.BasicSet.empty(self.get_space())
+        else:
+            true_branch_set = curr_node.bset.intersect(self.__reconstruct_set_(curr_node.true_branch_node))
+            false_branch_set = self.__negate_bset(curr_node.bset).intersect(
+                self.__reconstruct_set(curr_node.false_branch_node))
+            return true_branch_set.union(false_branch_set)
 
     def __reconstruct_set(self, curr_node, memo):
         # quast is a single node
@@ -226,19 +245,14 @@ class Quast:
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
-    def project_out(self, dim_type, first, n ):
-        # T = self.__get_tree_expansion()
-        # project_out_quast = Quast(space=T.get_space())
-        # root_to_node_path = []
-        # self.__project_out(T, T.root_node, project_out_quast, root_to_node_path, dim_type, first, n)
-        # return project_out_quast
-        T = Quast(space=self.get_space(), in_node=self.in_node, out_node=self.out_node)
-        T.root_node = self.__project_out_(self.root_node, T, set(), {}, dim_type, first, n)
-        T.set_space(T.root_node.bset.get_space())
-        return T
-
-
-
+    def project_out(self, dim_type, first, n):
+        # get the new projected out space
+        projected_out_universe = isl.Set.universe(self.get_space()).project_out(dim_type, first, n)
+        # create new projected out quast with the projected out space
+        project_out_quast = Quast(space=projected_out_universe.get_space(), in_node=self.in_node, out_node=self.out_node)
+        # construct the projected out quast
+        project_out_quast.root_node = self.__project_out_(self.root_node, project_out_quast, [], {}, projected_out_universe, dim_type, first, n)
+        return project_out_quast
 
     def subtract(self, quast):
         return self.intersect(quast.complement())
@@ -267,51 +281,51 @@ class Quast:
             is_false_branch_empty = self.__is_empty(curr_node.false_branch_node, root_to_node_true_set, new_root_to_node_false_set)
             return is_false_branch_empty
 
-    def __project_out(self, tree_expansion, curr_node, project_out_quast, root_to_node_path, dim_type, first, n):
-        if curr_node is tree_expansion.in_node:
-            return project_out_quast.in_node
-        elif curr_node is tree_expansion.out_node:
-            return project_out_quast.out_node
-        else:
-            path_constraint = isl.BasicSet.universe(self.get_space())
-            for bset in root_to_node_path:
-                path_constraint = path_constraint.intersect(bset)
-            curr_constraint = curr_node.bset.intersect(path_constraint)
-            new_constraint = curr_constraint.project_out(dim_type, first, n).gist(
-                path_constraint.project_out(dim_type, first, n))
-
-            if new_constraint == isl.BasicSet.universe(new_constraint.get_space()):
-                root_to_node_path.append(curr_constraint)
-                new_true_branch = self.__project_out(tree_expansion, curr_node.true_branch_node, project_out_quast,
-                                                     root_to_node_path, dim_type, first, n)
-                root_to_node_path.pop()
-                if curr_node is tree_expansion.root_node:
-                    project_out_quast.root_node = new_true_branch
-                    project_out_quast.set_space(new_constraint.get_space())
-                return new_true_branch
-            elif new_constraint.is_empty():
-                root_to_node_path.append(curr_constraint.complement())
-                new_false_branch = self.__project_out(tree_expansion, curr_node.false_branch_node, project_out_quast,
-                                                      root_to_node_path, dim_type, first, n)
-                root_to_node_path.pop()
-                if curr_node is tree_expansion.root_node:
-                    project_out_quast.root_node = new_false_branch
-                    project_out_quast.set_space(new_constraint.get_space())
-                return new_false_branch
-            else:
-                root_to_node_path.append(curr_constraint)
-                new_true_branch = self.__project_out(tree_expansion, curr_node.true_branch_node, project_out_quast,
-                                                     root_to_node_path, dim_type, first, n)
-                root_to_node_path.pop()
-                root_to_node_path.append(curr_constraint.complement())
-                new_false_branch = self.__project_out(tree_expansion, curr_node.false_branch_node, project_out_quast,
-                                                      root_to_node_path, dim_type, first, n)
-                root_to_node_path.pop()
-                new_node = Node(new_constraint, true_branch_node=new_true_branch, false_branch_node=new_false_branch)
-                if curr_node is tree_expansion.root_node:
-                    project_out_quast.root_node = new_node
-                    project_out_quast.set_space(new_constraint.get_space())
-                return new_node
+    # def __project_out(self, tree_expansion, curr_node, project_out_quast, root_to_node_path, dim_type, first, n):
+    #     if curr_node is tree_expansion.in_node:
+    #         return project_out_quast.in_node
+    #     elif curr_node is tree_expansion.out_node:
+    #         return project_out_quast.out_node
+    #     else:
+    #         path_constraint = isl.BasicSet.universe(self.get_space())
+    #         for bset in root_to_node_path:
+    #             path_constraint = path_constraint.intersect(bset)
+    #         curr_constraint = curr_node.bset.intersect(path_constraint)
+    #         new_constraint = curr_constraint.project_out(dim_type, first, n).gist(
+    #             path_constraint.project_out(dim_type, first, n))
+    #
+    #         if new_constraint == isl.BasicSet.universe(new_constraint.get_space()):
+    #             root_to_node_path.append(curr_constraint)
+    #             new_true_branch = self.__project_out(tree_expansion, curr_node.true_branch_node, project_out_quast,
+    #                                                  root_to_node_path, dim_type, first, n)
+    #             root_to_node_path.pop()
+    #             if curr_node is tree_expansion.root_node:
+    #                 project_out_quast.root_node = new_true_branch
+    #                 project_out_quast.set_space(new_constraint.get_space())
+    #             return new_true_branch
+    #         elif new_constraint.is_empty():
+    #             root_to_node_path.append(curr_constraint.complement())
+    #             new_false_branch = self.__project_out(tree_expansion, curr_node.false_branch_node, project_out_quast,
+    #                                                   root_to_node_path, dim_type, first, n)
+    #             root_to_node_path.pop()
+    #             if curr_node is tree_expansion.root_node:
+    #                 project_out_quast.root_node = new_false_branch
+    #                 project_out_quast.set_space(new_constraint.get_space())
+    #             return new_false_branch
+    #         else:
+    #             root_to_node_path.append(curr_constraint)
+    #             new_true_branch = self.__project_out(tree_expansion, curr_node.true_branch_node, project_out_quast,
+    #                                                  root_to_node_path, dim_type, first, n)
+    #             root_to_node_path.pop()
+    #             root_to_node_path.append(curr_constraint.complement())
+    #             new_false_branch = self.__project_out(tree_expansion, curr_node.false_branch_node, project_out_quast,
+    #                                                   root_to_node_path, dim_type, first, n)
+    #             root_to_node_path.pop()
+    #             new_node = Node(new_constraint, true_branch_node=new_true_branch, false_branch_node=new_false_branch)
+    #             if curr_node is tree_expansion.root_node:
+    #                 project_out_quast.root_node = new_node
+    #                 project_out_quast.set_space(new_constraint.get_space())
+    #             return new_node
 
     def __apply(self, curr_node, mapped_quast, bmap):
         if curr_node is self.in_node:
@@ -418,58 +432,66 @@ class Quast:
                 extended_space_quast.root_node = extended_node
             return extended_node
 
-    def __get_tree_expansion(self):
-        expansion_quast = Quast(space=self.get_space())
-        self.__expand_quast_into_tree(self.root_node, expansion_quast)
-        return expansion_quast
+    # def __get_tree_expansion(self):
+    #     expansion_quast = Quast(space=self.get_space())
+    #     self.__expand_quast_into_tree(self.root_node, expansion_quast)
+    #     return expansion_quast
+    #
+    # def __expand_quast_into_tree(self, curr_node, expansion_quast):
+    #     if curr_node is self.in_node:
+    #         return expansion_quast.in_node
+    #     elif curr_node is self.out_node:
+    #         return expansion_quast.out_node
+    #     else:
+    #         expanded_true_branch_node = self.__expand_quast_into_tree(curr_node.true_branch_node, expansion_quast)
+    #         expanded_false_branch_node = self.__expand_quast_into_tree(curr_node.false_branch_node, expansion_quast)
+    #         new_node = Node(bset=curr_node.bset, true_branch_node=expanded_true_branch_node,
+    #                         false_branch_node=expanded_false_branch_node)
+    #         if curr_node is self.root_node:
+    #             expansion_quast.root_node = new_node
+    #         return new_node
 
-    def __expand_quast_into_tree(self, curr_node, expansion_quast):
-        if curr_node is self.in_node:
-            return expansion_quast.in_node
-        elif curr_node is self.out_node:
-            return expansion_quast.out_node
-        else:
-            expanded_true_branch_node = self.__expand_quast_into_tree(curr_node.true_branch_node, expansion_quast)
-            expanded_false_branch_node = self.__expand_quast_into_tree(curr_node.false_branch_node, expansion_quast)
-            new_node = Node(bset=curr_node.bset, true_branch_node=expanded_true_branch_node,
-                            false_branch_node=expanded_false_branch_node)
-            if curr_node is self.root_node:
-                expansion_quast.root_node = new_node
-            return new_node
-
-    def __project_out_(self, node, project_out_quast, root_to_node_set, memo, dim_type, first, n):
+    def __project_out_(self, node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n):
         if node is self.in_node:
             if not root_to_node_set:
                 return project_out_quast.in_node
             else:
-                new_set = isl.Set.universe(self.get_space())
+                new_set = isl.Set.universe(project_out_quast.get_space())
                 for bset in root_to_node_set:
                     new_set = new_set.intersect(bset)
                 new_set = new_set.project_out(dim_type, first, n)
-                new_node = Node(bset=new_set, true_branch_node=project_out_quast.in_node, false_branch_node=project_out_quast.out_node)
-                return new_node
+                next_true_branch_node = project_out_quast.in_node
+                for bset_constraint in new_set.get_basic_sets():
+                    new_node = Node(bset=bset_constraint, false_branch_node=project_out_quast.out_node,
+                                true_branch_node=next_true_branch_node)
+                    next_true_branch_node = new_node
+                return next_true_branch_node
         elif node is self.out_node:
             return project_out_quast.out_node
         else:
             fset = frozenset(root_to_node_set)
             if node in memo:
                 if fset in memo[node]:
-                    return memo[root_to_node_set]
+                    return memo[node][fset]
             else:
                 memo[node] = {}
-
+            # if node has dimensions to be projected out
             if node.bset.involves_dims(dim_type, first, n):
-                root_to_node_set.add(node.bset)
-                new_true_branch_node = self.__project_out_(node.true_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
-                root_to_node_set.remove(node.bset)
+                # add the constraint to the set of true constraints from root, recurse and then remove.
+                root_to_node_set.append(node.bset)
+                new_true_branch_node = self.__project_out_(node.true_branch_node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n)
+                root_to_node_set.pop()
                 negated_set = self.__negate_bset(node.bset)
-                root_to_node_set.add(negated_set)
-                new_false_branch_node = self.__project_out_(node.false_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
-                root_to_node_set.remove(negated_set)
+                root_to_node_set.append(negated_set)
+                new_false_branch_node = self.__project_out_(node.false_branch_node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n)
+                root_to_node_set.pop()
                 new_node = self.__union(new_true_branch_node, {project_out_quast.out_node: new_false_branch_node, project_out_quast.in_node: project_out_quast.in_node})
+            # else dimensions do not have any dimensions to be projected out
             else:
-                new_true_branch_node = self.__project_out_(node.true_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
-                new_false_branch_node = self.__project_out_(node.false_branch_node, project_out_quast, root_to_node_set, memo, dim_type, first, n)
+                # Recurse on successors (post-order) without adding the node constraint to the root_to_node_set
+                new_true_branch_node = self.__project_out_(node.true_branch_node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n)
+                new_false_branch_node = self.__project_out_(node.false_branch_node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n)
+                # Project out the dimensions from the space of the set.
                 new_node = Node(node.bset.project_out(dim_type, first, n), false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
 
             memo[node][fset] = new_node
