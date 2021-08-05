@@ -166,36 +166,11 @@ class Quast:
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
 
-    ################################################################
-    # Wrappers for islpy.Set functions (for callbacks)
-    ################################################################
-
-    def __isl_apply(self, set_, map_):
-        return set_.apply(map_)
-
-    def __isl_align_params(self, set_, model):
-        return set_.align_params(model)
-
-    def __isl_add_dims(self, set_, type, n):
-        return set_.add_dims(type, n)
-
-    def __isl_remove_dims(self, set_, type, first, n):
-        return set_.remove_dims(type, first, n)
-
-    def __isl_insert_dims(self, set_, type, pos, n):
-        return set_.insert_dims(type, pos, n)
-
-    def __apply_callback_to_every_node(self, node, memo, callback, *args):
-        if node.is_terminal():
-            return node
-        elif node in memo:
-            return memo[node]
-        else:
-            new_true_branch = self.__apply_callback_to_every_node(node.true_branch_node, memo, callback, *args)
-            new_false_branch = self.__apply_callback_to_every_node(node.false_branch_node, memo, callback, *args)
-            new_node = Node(callback(node.bset, *args), false_branch_node=new_false_branch, true_branch_node=new_true_branch)
-            memo[node] = new_node
-            return new_node
+    def lower_bound_si(self, dim_type, pos, val):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_lower_bound_si, dim_type, pos, val)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
 
     ################################################################
     # Data structure specific functions
@@ -239,9 +214,45 @@ class Quast:
         #print(dot.source)
         dot.render('visualization-output/'+output_filename, view=True)
 
+    ################################################################
+    # Wrappers for islpy.Set functions (for callbacks)
+    ################################################################
+
+    def __isl_lower_bound_si(self, set_, dim_type, pos, value):
+        val = isl.Val(value)
+        return set_.lower_bound_val(dim_type, pos, val)
+
+    def __isl_apply(self, set_, map_):
+        return set_.apply(map_)
+
+    def __isl_align_params(self, set_, model):
+        return set_.align_params(model)
+
+    def __isl_add_dims(self, set_, type, n):
+        return set_.add_dims(type, n)
+
+    def __isl_remove_dims(self, set_, type, first, n):
+        return set_.remove_dims(type, first, n)
+
+    def __isl_insert_dims(self, set_, type, pos, n):
+        return set_.insert_dims(type, pos, n)
+
     ########################################################################
     # Internal implementation of set operations in quast representation
     ########################################################################
+
+    def __apply_callback_to_every_node(self, node, memo, callback, *args):
+        if node.is_terminal():
+            return node
+        elif node in memo:
+            return memo[node]
+        else:
+            new_true_branch = self.__apply_callback_to_every_node(node.true_branch_node, memo, callback, *args)
+            new_false_branch = self.__apply_callback_to_every_node(node.false_branch_node, memo, callback, *args)
+            new_node = Node(callback(node.bset, *args), false_branch_node=new_false_branch,
+                            true_branch_node=new_true_branch)
+            memo[node] = new_node
+            return new_node
 
     # root_to_node_true_set: is an isl.BasicSet of all the TRUE constraints along root to node path
     # root_to_node_false_set: isl.Set (only or constraints) of all the FALSE constraints along the root to node path
