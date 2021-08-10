@@ -57,6 +57,30 @@ class Quast:
         quast.root_node = quast.in_node
         return quast
 
+    def coalesce(self):
+        # TODO -- complete method. Unclear whether this would be useful for quasts
+        pass
+        return self.copy()
+
+    def detect_equalities(self):
+        # TODO -- complete method. Unclear whether this would be useful for quasts
+        pass
+        return self.copy()
+
+    def upper_bound_val(self, type, pos, value):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_upper_bound_val, type,
+                                                                  pos, value)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
+
+    def lower_bound_val(self, type, pos, value):
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_lower_bound_val, type,
+                                                                  pos, value)
+        new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
+
     def add_dims(self, type, n):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_add_dims, type, n)
@@ -78,7 +102,8 @@ class Quast:
     def align_params(self, model):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
         new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_align_params, model)
-        new_quast.set_space(new_quast.root_node.bset.get_space())
+        if not new_quast.root_node.is_terminal():
+            new_quast.set_space(new_quast.root_node.bset.get_space())
         return new_quast
 
     def apply(self, map_):
@@ -93,10 +118,16 @@ class Quast:
     def union(self, quast):
         # if self.get_space() != quast.get_space():
         #     raise Exception("spaces don't match")
-        if not self.root_node.is_terminal():
-            union_space = self.root_node.bset.union(quast.root_node.bset).get_space()
+        if self.root_node.is_terminal():
+            bset1 = isl.Set.empty(self.get_space())
         else:
-            union_space = self.get_space()
+            bset1 = self.root_node.bset
+
+        if quast.root_node.is_terminal():
+            bset2 = isl.Set.empty(quast.get_space())
+        else:
+            bset2 = quast.root_node.bset
+        union_space = bset1.union(bset2).get_space()
         union_quast = Quast(space=union_space, in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
@@ -108,10 +139,17 @@ class Quast:
     def intersect(self, quast):
         # if self.get_space() != quast.get_space():
         #     raise Exception("spaces don't match")
-        if not self.root_node.is_terminal():
-            intersection_space = self.root_node.bset.intersect(quast.root_node.bset).get_space()
+        if self.root_node.is_terminal():
+            bset1 = isl.Set.empty(self.get_space())
         else:
-            intersection_space = self.get_space()
+            bset1 = self.root_node.bset
+
+        if quast.root_node.is_terminal():
+            bset2 = isl.Set.empty(quast.get_space())
+        else:
+            bset2 = quast.root_node.bset
+
+        intersection_space = bset1.intersect(bset2).get_space()
         intersection_quast = Quast(space=intersection_space, in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: quast.root_node, self.out_node: intersection_quast.out_node}
         intersection_quast.root_node = self.__intersect(self.root_node, memo)
@@ -221,6 +259,12 @@ class Quast:
     def __isl_lower_bound_si(self, set_, dim_type, pos, value):
         val = isl.Val(value)
         return set_.lower_bound_val(dim_type, pos, val)
+
+    def __isl_lower_bound_val(self, set_, dim_type, pos, value):
+        return set_.lower_bound_val(dim_type, pos, value)
+
+    def __isl_upper_bound_val(self, set_, dim_type, pos, value):
+        return set_.upper_bound_val(dim_type, pos, value)
 
     def __isl_apply(self, set_, map_):
         return set_.apply(map_)
@@ -406,7 +450,7 @@ class Quast:
             if not root_to_node_set:
                 return project_out_quast.in_node
             else:
-                new_set = isl.Set.universe(project_out_quast.get_space())
+                new_set = isl.Set.universe(self.get_space())
                 for bset in root_to_node_set:
                     new_set = new_set.intersect(bset)
                 new_set = new_set.project_out(dim_type, first, n)
