@@ -124,6 +124,10 @@ class Quast:
             new_quast.set_space(new_quast.root_node.bset.get_space())
         return new_quast
 
+    # Todo - can implement by traversing all paths (instead of first constructing the set and then getting basic sets)
+    def get_basic_set_list(self):
+        return self.reconstruct_set().get_basic_list()
+
     # TODO -- implement using project out
     def apply(self, map_):
         # new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
