@@ -1,5 +1,5 @@
 import islpy as isl
-import V3.Quast as Q
+import dev.Quast as Q
 from timeit import default_timer as timer
 import matplotlib.pyplot as plt
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         print("-------------------------------------")
     x_axis = [i for i in range(NUM_NON_EQUALITIES)]
     plt.plot(x_axis, quast_times, 'r--', x_axis, set_times, 'b--')
-    #plt.savefig('/Users/shubhangkulkarni/PycharmProjects/ANLSummer21/V3/Experiments/Plots/construction_times_plot.pdf')
+    #plt.savefig('/Users/shubhangkulkarni/PycharmProjects/ANLSummer21/dev/Experiments/Plots/construction_times_plot.pdf')
     #plt.show()
     for j in range(6, NUM_NON_EQUALITIES):
         assert quast_outputs[j].reconstruct_set() == set_outputs[j]

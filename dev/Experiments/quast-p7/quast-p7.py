@@ -1,6 +1,6 @@
 import islpy as isl
-import V3.Quast as Q
-from V3.Experiments.timer import Timer
+import dev.Quast as Q
+from dev.Experiments.timer import Timer
 import sys
 
 

@@ -1,5 +1,5 @@
 import islpy as isl
-import V3.Quast as Q
+import dev.Quast as Q
 from timeit import default_timer as timer
 import matplotlib.pyplot as plt
 
@@ -97,7 +97,7 @@ def construct_quast():
 #     # print(set_times)
 #     # x_axis = [i for i in range(len(quast_times))]
 #     # plt.plot(x_axis, quast_times, 'r--', x_axis, set_times, 'b--')
-#     # plt.savefig('/Users/shubhangkulkarni/PycharmProjects/ANLSummer21/V3/subset_plot.pdf')
+#     # plt.savefig('/Users/shubhangkulkarni/PycharmProjects/ANLSummer21/dev/subset_plot.pdf')
 #     # plt.show()
 
 def simplify_bug():

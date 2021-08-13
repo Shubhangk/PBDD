@@ -67,18 +67,36 @@ class Quast:
         pass
         return self.copy()
 
-    def upper_bound_val(self, type, pos, value):
+    def set_tuple_id(self, id):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
-        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_upper_bound_val, type,
-                                                                  pos, value)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_set_tuple_id, id)
         new_quast.set_space(new_quast.root_node.bset.get_space())
         return new_quast
 
-    def lower_bound_val(self, type, pos, value):
+    def reset_tuple_id(self):
         new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
-        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_lower_bound_val, type,
-                                                                  pos, value)
+        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_reset_tuple_id)
         new_quast.set_space(new_quast.root_node.bset.get_space())
+        return new_quast
+
+    def upper_bound_val(self, type, pos, value):
+        upper_bound_constraint = isl.Constraint.inequality_alloc(self.get_space())
+        upper_bound_constraint = upper_bound_constraint.set_coefficient_val(type, pos, isl.Val('-1'))
+        upper_bound_constraint = upper_bound_constraint.set_constant_val(value)
+        upper_bound_set = isl.Set.universe(self.get_space()).add_constraint(upper_bound_constraint)
+        upper_bound_node = Node(bset=upper_bound_set, true_branch_node=self.root_node, false_branch_node=self.out_node)
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = upper_bound_node
+        return new_quast
+
+    def lower_bound_val(self, type, pos, value):
+        lower_bound_constraint = isl.Constraint.inequality_alloc(self.get_space())
+        lower_bound_constraint = lower_bound_constraint.set_coefficient_val(type, pos, isl.Val('1'))
+        lower_bound_constraint = lower_bound_constraint.set_constant_val(value.neg())
+        lower_bound_set = isl.Set.universe(self.get_space()).add_constraint(lower_bound_constraint)
+        lower_bound_node = Node(bset=lower_bound_set, true_branch_node=self.root_node, false_branch_node=self.out_node)
+        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        new_quast.root_node = lower_bound_node
         return new_quast
 
     def add_dims(self, type, n):
@@ -106,10 +124,12 @@ class Quast:
             new_quast.set_space(new_quast.root_node.bset.get_space())
         return new_quast
 
+    # TODO -- implement using project out
     def apply(self, map_):
-        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
-        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_apply, map_)
-        new_quast.set_space(new_quast.root_node.bset.get_space())
+        # new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
+        # new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_apply, map_)
+        # new_quast.set_space(new_quast.root_node.bset.get_space())
+        new_quast = Quast(self.reconstruct_set().apply(map_))
         return new_quast
 
     def params(self):
@@ -118,16 +138,17 @@ class Quast:
     def union(self, quast):
         # if self.get_space() != quast.get_space():
         #     raise Exception("spaces don't match")
-        if self.root_node.is_terminal():
-            bset1 = isl.Set.empty(self.get_space())
-        else:
-            bset1 = self.root_node.bset
-
-        if quast.root_node.is_terminal():
-            bset2 = isl.Set.empty(quast.get_space())
-        else:
-            bset2 = quast.root_node.bset
+        bset1 = isl.Set.empty(self.get_space())
+        bset2 = isl.Set.empty(quast.get_space())
         union_space = bset1.union(bset2).get_space()
+        if self.root_node.is_terminal():
+            union_quast = quast.copy()
+            union_quast.set_space(union_space)
+            return union_quast
+        elif quast.root_node.is_terminal():
+            union_quast = self.copy()
+            union_quast.set_space(union_space)
+            return union_quast
         union_quast = Quast(space=union_space, in_node=quast.in_node, out_node=quast.out_node)
         memo = {self.in_node: union_quast.in_node, self.out_node: quast.root_node}
         union_quast.root_node = self.__union(self.root_node, memo)
@@ -179,6 +200,7 @@ class Quast:
         project_out_quast = Quast(space=projected_out_universe.get_space(), in_node=self.in_node, out_node=self.out_node)
         # construct the projected out quast
         project_out_quast.root_node = self.__project_out(self.root_node, project_out_quast, [], {}, projected_out_universe, dim_type, first, n)
+        #project_out_quast.simplify()
         return project_out_quast
 
     def subtract(self, quast):
@@ -189,6 +211,7 @@ class Quast:
         quast_copy.root_node = self.root_node
         return quast_copy
 
+    # Todo -- fix
     def flat_product(self, quast):
         extension_space = quast.get_space()
         extended_space = self.__get_extended_space(extension_space)
@@ -198,17 +221,12 @@ class Quast:
         quast.__project_quast_into_extended_space(quast.root_node, extended_space, extended_space_quast, True)
         return extended_space_self.intersect(extended_space_quast)
 
+    # Todo -- fix
     def extend_space(self, extension_space):
         extended_space = self.__get_extended_space(extension_space)
         extended_space_quast = Quast(space=extended_space)
         self.__project_quast_into_extended_space(self.root_node, extended_space, extended_space_quast)
         return extended_space_quast
-
-    def lower_bound_si(self, dim_type, pos, val):
-        new_quast = Quast(space=self.get_space(), out_node=self.out_node, in_node=self.in_node)
-        new_quast.root_node = self.__apply_callback_to_every_node(self.root_node, {}, self.__isl_lower_bound_si, dim_type, pos, val)
-        new_quast.set_space(new_quast.root_node.bset.get_space())
-        return new_quast
 
     ################################################################
     # Data structure specific functions
@@ -255,6 +273,12 @@ class Quast:
     ################################################################
     # Wrappers for islpy.Set functions (for callbacks)
     ################################################################
+
+    def __isl_set_tuple_id(self, set_, id):
+        return set_.set_tuple_id(id)
+
+    def __isl_reset_tuple_id(self, set_):
+        return set_.reset_tuple_id()
 
     def __isl_lower_bound_si(self, set_, dim_type, pos, value):
         val = isl.Val(value)
@@ -453,13 +477,21 @@ class Quast:
                 new_set = isl.Set.universe(self.get_space())
                 for bset in root_to_node_set:
                     new_set = new_set.intersect(bset)
-                new_set = new_set.project_out(dim_type, first, n)
-                next_true_branch_node = project_out_quast.in_node
-                for bset_constraint in new_set.get_basic_sets():
-                    new_node = Node(bset=bset_constraint, false_branch_node=project_out_quast.out_node,
-                                true_branch_node=next_true_branch_node)
-                    next_true_branch_node = new_node
-                return next_true_branch_node
+                new_set = new_set.project_out(dim_type, first, n).compute_divs()
+                new_node = project_out_quast.in_node
+                next_false_branch_node = project_out_quast.out_node
+                for bset in new_set.get_basic_sets():
+                    next_true_branch_node = project_out_quast.in_node
+                    constraints_as_bsets = [isl.Set.from_basic_set(isl.BasicSet.from_constraint(constraint)) for
+                                            constraint in bset.get_constraints()]
+                    new_node = next_true_branch_node
+                    for bset_constraint in constraints_as_bsets:
+                        new_node = Node(bset=bset_constraint, false_branch_node=next_false_branch_node,
+                                        true_branch_node=next_true_branch_node)
+                        next_true_branch_node = new_node
+                    next_false_branch_node = new_node
+                #new_node, _ = self.__simplify(new_node, {})
+                return new_node
         elif node is self.out_node:
             return project_out_quast.out_node
         else:
@@ -486,8 +518,20 @@ class Quast:
                 new_true_branch_node = self.__project_out(node.true_branch_node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n)
                 new_false_branch_node = self.__project_out(node.false_branch_node, project_out_quast, root_to_node_set, memo, new_universe, dim_type, first, n)
                 # Project out the dimensions from the space of the set.
-                new_node = Node(node.bset.project_out(dim_type, first, n), false_branch_node=new_false_branch_node, true_branch_node=new_true_branch_node)
-
+                new_set = node.bset.project_out(dim_type, first, n).compute_divs()
+                next_true_branch_node = new_true_branch_node
+                bsets = new_set.get_basic_sets()
+                if len(bsets) > 1:
+                    print(new_set)
+                    raise Exception("node contains more than one basic set")
+                constraints_as_bsets = [isl.Set.from_basic_set(isl.BasicSet.from_constraint(constraint)) for constraint
+                                        in bsets[0].get_constraints()]
+                new_node = new_true_branch_node
+                for bset_constraint in constraints_as_bsets:
+                    new_node = Node(bset=bset_constraint, false_branch_node=new_false_branch_node,
+                                true_branch_node=next_true_branch_node)
+                    next_true_branch_node = new_node
+                # new_node, _ = self.__simplify(new_node, {})
             memo[node][fset] = new_node
             return new_node
 
@@ -522,15 +566,15 @@ class Quast:
     # Internal implementation of quast optimization functions
     ########################################################################
 
-    def __simplify(self, node, isomorphic_nodes_memo):
+    def __simplify(self, node, isomorphic_nodes_memo, depth=0):
         if node.is_terminal():
             return node, False
         elif (node.bset, node.true_branch_node, node.false_branch_node) in isomorphic_nodes_memo:
             return isomorphic_nodes_memo[(node.bset, node.true_branch_node, node.false_branch_node)], True
         else:
             # post-order traversal
-            new_true_branch_node, is_true_modified = self.__simplify(node.true_branch_node, isomorphic_nodes_memo)
-            new_false_branch_node, is_false_modified = self.__simplify(node.false_branch_node, isomorphic_nodes_memo)
+            new_true_branch_node, is_true_modified = self.__simplify(node.true_branch_node, isomorphic_nodes_memo, depth+1)
+            new_false_branch_node, is_false_modified = self.__simplify(node.false_branch_node, isomorphic_nodes_memo, depth+1)
 
             # prune redundant checks
             if new_true_branch_node is new_false_branch_node:
