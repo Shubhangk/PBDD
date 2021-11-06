@@ -1,1 +1,1 @@
-# Polyhedral Binary Decision Diagram
+# Polyhedral Binary Decision Diagram (PBDD)
